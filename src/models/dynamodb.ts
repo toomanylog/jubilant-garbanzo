@@ -359,4 +359,18 @@ export const updateSmtpProvider = async (provider: SmtpProvider): Promise<boolea
     console.error('Erreur lors de la mise à jour du fournisseur SMTP:', error);
     return false;
   }
+};
+
+// Supprime un fournisseur SMTP
+export const deleteSmtpProvider = async (providerId: string): Promise<boolean> => {
+  try {
+    // Dans une vraie implémentation, on appellerait l'API DynamoDB
+    console.log(`Suppression du fournisseur SMTP avec l'ID: ${providerId}`);
+    
+    // Simulation d'une réponse réussie
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de la suppression du fournisseur SMTP:', error);
+    return false;
+  }
 }; 
