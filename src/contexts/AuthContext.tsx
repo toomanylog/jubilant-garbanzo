@@ -304,7 +304,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             toast.success('Code de réinitialisation envoyé à votre email');
             resolve(true);
           },
-          onFailure: (err) => {
+          onFailure: (err: Error) => {
             console.error('Erreur lors de la demande de réinitialisation:', err);
             toast.error('Échec de la demande: ' + (err.message || 'Une erreur est survenue'));
             reject(err);
@@ -351,7 +351,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             toast.success('Mot de passe réinitialisé avec succès');
             resolve(true);
           },
-          onFailure: (err) => {
+          onFailure: (err: Error) => {
             console.error('Erreur lors de la confirmation de réinitialisation:', err);
             toast.error('Échec de la réinitialisation: ' + (err.message || 'Une erreur est survenue'));
             reject(err);
