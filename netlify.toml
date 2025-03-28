@@ -13,4 +13,3 @@
   REACT_APP_AWS_REGION = "us-east-1"
   REACT_APP_AWS_USER_POOL_ID = "us-east-1_MruE6Kyew"
   REACT_APP_AWS_APP_CLIENT_ID = "37di4rkduiuhvhc2jos507qsdl"
-  REACT_APP_AWS_APP_CLIENT_SECRET = "votre_client_secret_ici" 

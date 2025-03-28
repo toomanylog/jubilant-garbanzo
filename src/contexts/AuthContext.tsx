@@ -274,37 +274,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('Tentative d\'inscription avec email:', email);
         console.log('SECRET_HASH disponible:', !!secretHash);
         
-        // Version correcte pour Cognito avec SECRET_HASH
-        // Créer un objet options avec la propriété SecretHash si disponible
-        const signUpParams: any = {};
+        // Validation data avec SECRET_HASH si disponible
+        const validationData: any[] = [];
+        
+        // ClientMetadata avec SECRET_HASH si disponible
+        const clientMetadata: any = {};
         if (secretHash) {
-          signUpParams.SecretHash = secretHash;
+          clientMetadata.SECRET_HASH = secretHash;
         }
         
-        console.log('Paramètres d\'inscription:', signUpParams);
+        console.log('ClientMetadata pour inscription:', clientMetadata);
         
         // Version compatible avec la structure attendue par l'API Cognito
-        userPool.signUp(email, password, attributeList, [], (err, result) => {
-          if (err) {
-            console.error('Erreur lors de l\'inscription:', err);
-            console.error('Code d\'erreur:', (err as CognitoError).code);
-            console.error('Message d\'erreur:', err.message);
-            toast.error('Échec de l\'inscription: ' + (err.message || 'Une erreur est survenue'));
-            reject(err);
-            return;
-          }
-          
-          if (result) {
-            console.log('Inscription réussie, utilisateur:', result.user);
-            console.log('UserConfirmed:', result.userConfirmed);
-            console.log('UserSub:', result.userSub);
-            toast.success('Inscription réussie! Veuillez vérifier votre email pour confirmer votre compte.');
-            resolve(true);
-          } else {
-            toast.error('Échec de l\'inscription');
-            resolve(false);
-          }
-        }, signUpParams);
+        // Passage du SECRET_HASH directement comme paramètre de requête
+        userPool.signUp(
+          email, 
+          password, 
+          attributeList, 
+          validationData,
+          (err, result) => {
+            if (err) {
+              console.error('Erreur lors de l\'inscription:', err);
+              console.error('Code d\'erreur:', (err as CognitoError).code);
+              console.error('Message d\'erreur:', err.message);
+              toast.error('Échec de l\'inscription: ' + (err.message || 'Une erreur est survenue'));
+              reject(err);
+              return;
+            }
+            
+            if (result) {
+              console.log('Inscription réussie, utilisateur:', result.user);
+              console.log('UserConfirmed:', result.userConfirmed);
+              console.log('UserSub:', result.userSub);
+              toast.success('Inscription réussie! Veuillez vérifier votre email pour confirmer votre compte.');
+              resolve(true);
+            } else {
+              toast.error('Échec de l\'inscription');
+              resolve(false);
+            }
+          },
+          secretHash ? { SecretHash: secretHash, ClientMetadata: clientMetadata } : undefined
+        );
       });
     } catch (error) {
       console.error('Erreur lors de l\'inscription:', error);
