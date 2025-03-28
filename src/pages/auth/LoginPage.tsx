@@ -137,12 +137,12 @@ const LoginPage: React.FC = () => {
                 </div>
 
                 <div className="text-sm">
-                  <button 
+                  <Link 
+                    to="/forgot-password"
                     className="font-medium text-primary hover:text-primary-600 transition-colors"
-                    onClick={() => toast.info("Fonctionnalité en cours de développement")}
                   >
                     Mot de passe oublié?
-                  </button>
+                  </Link>
                 </div>
               </div>
 

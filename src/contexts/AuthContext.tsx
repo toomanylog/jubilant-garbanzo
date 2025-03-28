@@ -27,6 +27,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   register: (email: string, password: string, fullName: string) => Promise<boolean>;
   logout: () => void;
+  forgotPassword: (email: string) => Promise<boolean>;
+  confirmForgotPassword: (email: string, code: string, newPassword: string) => Promise<boolean>;
 }
 
 // Création du contexte
@@ -252,6 +254,66 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Fonction pour demander la réinitialisation du mot de passe
+  const forgotPassword = async (email: string): Promise<boolean> => {
+    try {
+      const userData = {
+        Username: email,
+        Pool: userPool
+      };
+
+      const cognitoUser = new CognitoUser(userData);
+
+      return new Promise((resolve, reject) => {
+        cognitoUser.forgotPassword({
+          onSuccess: () => {
+            toast.success('Code de réinitialisation envoyé à votre email');
+            resolve(true);
+          },
+          onFailure: (err) => {
+            console.error('Erreur lors de la demande de réinitialisation:', err);
+            toast.error('Échec de la demande: ' + (err.message || 'Une erreur est survenue'));
+            reject(err);
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Erreur lors de la demande de réinitialisation:', error);
+      toast.error('Échec de la demande de réinitialisation');
+      return false;
+    }
+  };
+
+  // Fonction pour confirmer la réinitialisation du mot de passe avec le code
+  const confirmForgotPassword = async (email: string, code: string, newPassword: string): Promise<boolean> => {
+    try {
+      const userData = {
+        Username: email,
+        Pool: userPool
+      };
+
+      const cognitoUser = new CognitoUser(userData);
+
+      return new Promise((resolve, reject) => {
+        cognitoUser.confirmPassword(code, newPassword, {
+          onSuccess: () => {
+            toast.success('Mot de passe réinitialisé avec succès');
+            resolve(true);
+          },
+          onFailure: (err) => {
+            console.error('Erreur lors de la confirmation de réinitialisation:', err);
+            toast.error('Échec de la réinitialisation: ' + (err.message || 'Une erreur est survenue'));
+            reject(err);
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Erreur lors de la confirmation de réinitialisation:', error);
+      toast.error('Échec de la confirmation de réinitialisation');
+      return false;
+    }
+  };
+
   // Valeurs du contexte
   const value = {
     currentUser,
@@ -260,7 +322,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     error,
     login,
     register,
-    logout
+    logout,
+    forgotPassword,
+    confirmForgotPassword
   };
 
   return (

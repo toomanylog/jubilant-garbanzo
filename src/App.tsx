@@ -17,6 +17,7 @@ import CookiesPage from './pages/legal/CookiesPage';
 // Pages
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import SmtpProviderList from './pages/smtp-providers/SmtpProviderList';
 import SmtpProviderForm from './pages/smtp-providers/SmtpProviderForm';
@@ -84,6 +85,7 @@ const App: React.FC = () => {
                 {/* Routes publiques */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 
                 {/* Pages légales et aide */}
                 <Route path="/legal/terms" element={<TermsPage />} />
