@@ -4,7 +4,6 @@ import { Button } from '../ui/button';
 import { LayoutDashboard, BarChart, Settings, Package, Users, LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
 const Navbar: React.FC = () => {
   const { isAuthenticated, logout } = useAuth();
@@ -16,14 +15,6 @@ const Navbar: React.FC = () => {
     logout();
     navigate('/login');
     setIsMenuOpen(false);
-  };
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(part => part[0])
-      .join('')
-      .toUpperCase();
   };
 
   const menuItems = [

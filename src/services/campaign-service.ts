@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'react-toastify';
 import { 
   EmailCampaign, 
   EmailTemplate, 
@@ -7,7 +8,8 @@ import {
   getSmtpProviderById,
   createEmailCampaign,
   updateEmailCampaign,
-  getEmailCampaignById
+  getEmailCampaignById,
+  deleteEmailCampaign
 } from '../models/dynamodb';
 import { createSmtpService, EmailOptions } from './smtp-service';
 import { TemplateService } from './template-service';

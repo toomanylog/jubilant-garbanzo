@@ -5,14 +5,11 @@ import {
   Typography,
   Button,
   Paper,
-  Grid,
   Divider,
   Chip,
   Alert,
   CircularProgress,
   LinearProgress,
-  Card,
-  CardContent,
   List,
   ListItem,
   ListItemText,
@@ -22,16 +19,20 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
-  TextField
+  Stack,
+  Container
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
-import ScheduleIcon from '@mui/icons-material/Schedule';
 import SendIcon from '@mui/icons-material/Send';
 import RemoveRedEyeIcon from '@mui/icons-material/RemoveRedEye';
 import TouchAppIcon from '@mui/icons-material/TouchApp';
 import ErrorIcon from '@mui/icons-material/Error';
 import WarningIcon from '@mui/icons-material/Warning';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import PauseIcon from '@mui/icons-material/Pause';
+import ReplayIcon from '@mui/icons-material/Replay';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
 import { toast } from 'react-toastify';

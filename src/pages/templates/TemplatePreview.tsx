@@ -9,7 +9,6 @@ import {
   Alert,
   Divider,
   TextField,
-  Grid,
   IconButton,
   Tooltip
 } from '@mui/material';
@@ -90,7 +89,7 @@ const TemplatePreview: React.FC = () => {
     };
     
     fetchTemplate();
-  }, [currentUser, templateId]);
+  }, [currentUser, templateId, demoVariables]);
 
   const handleVariableChange = (name: string, value: string) => {
     const newVariables = { ...variables, [name]: value };

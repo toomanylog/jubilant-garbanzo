@@ -144,6 +144,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'North Eyes', descrip
         sx={{
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           ml: { sm: `${drawerWidth}px` },
+          boxShadow: isMobile ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
         }}
       >
         <Toolbar>

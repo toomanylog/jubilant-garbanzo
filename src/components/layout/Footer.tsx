@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Github, Twitter, Linkedin, Heart, Sparkles, Zap, Mail } from 'lucide-react';
+import { Github, Twitter, Linkedin, Heart, Sparkles, Zap } from 'lucide-react';
 
 const Footer: React.FC = () => {
   return (
@@ -12,7 +12,7 @@ const Footer: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Sparkles className="h-6 w-6 text-primary" />
               <h3 className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                Email Sender
+                North Eyes
               </h3>
             </div>
             <p className="text-gray-600 dark:text-gray-300">

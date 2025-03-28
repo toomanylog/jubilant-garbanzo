@@ -2,18 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Box, 
-  Typography, 
   Container,
-  Grid,
-  Button as MuiButton,
   LinearProgress
 } from '@mui/material';
-import { 
-  MailOutline as MailIcon, 
-  Send as SendIcon, 
-  ViewList as ListIcon, 
-  Description as TemplateIcon 
-} from '@mui/icons-material';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Mail, Send, FileText, Users, BarChart3, Zap } from 'lucide-react';
@@ -245,14 +236,14 @@ const DashboardPage: React.FC = () => {
                     <p className="text-gray-600 dark:text-gray-300">
                       Ajoutez les détails de connexion de votre fournisseur de services d'emails.
                     </p>
-                    <MuiButton 
-                      variant="text" 
-                      size="small" 
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
                       onClick={() => navigate('/smtp-providers/new')}
                       className="mt-2"
                     >
                       Ajouter un fournisseur
-                    </MuiButton>
+                    </Button>
                   </div>
                 </li>
                 
@@ -265,14 +256,14 @@ const DashboardPage: React.FC = () => {
                     <p className="text-gray-600 dark:text-gray-300">
                       Concevez un template attrayant avec notre éditeur visuel ou importez votre HTML.
                     </p>
-                    <MuiButton 
-                      variant="text" 
-                      size="small" 
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
                       onClick={() => navigate('/templates/new')}
                       className="mt-2"
                     >
                       Créer un template
-                    </MuiButton>
+                    </Button>
                   </div>
                 </li>
                 
@@ -285,14 +276,14 @@ const DashboardPage: React.FC = () => {
                     <p className="text-gray-600 dark:text-gray-300">
                       Choisissez votre template, sélectionnez vos destinataires et lancez votre campagne.
                     </p>
-                    <MuiButton 
-                      variant="text" 
-                      size="small" 
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
                       onClick={() => navigate('/campaigns/new')}
                       className="mt-2"
                     >
                       Créer une campagne
-                    </MuiButton>
+                    </Button>
                   </div>
                 </li>
               </ol>

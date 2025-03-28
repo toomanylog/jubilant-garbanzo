@@ -26,7 +26,6 @@ import TemplatePreview from './pages/templates/TemplatePreview';
 import CampaignList from './pages/campaigns/CampaignList';
 import CampaignForm from './pages/campaigns/CampaignForm';
 import CampaignDetails from './pages/campaigns/CampaignDetails';
-import SettingsPage from './pages/settings/SettingsPage';
 
 // Contexte d'authentification
 import { AuthProvider, useAuth } from './contexts/AuthContext';
