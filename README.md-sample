@@ -1,0 +1,90 @@
+# Email Sender
+
+Une application web moderne pour gérer les campagnes d'emails avec différents fournisseurs SMTP.
+
+## Fonctionnalités
+
+- Authentification des utilisateurs avec AWS Cognito
+- Stockage des données avec Amazon DynamoDB
+- Gestion des campagnes d'emails
+- Support de multiples fournisseurs SMTP :
+  - AWS SES
+  - Custom SMTP
+  - Office 365
+  - SendGrid
+  - Mailjet
+- Templates d'emails personnalisables avec variables dynamiques
+- Interface utilisateur moderne et réactive avec Material UI
+
+## Technologies utilisées
+
+- React.js avec TypeScript
+- AWS SDK pour la connexion à DynamoDB et Cognito
+- Material UI pour l'interface utilisateur
+- React Router pour la navigation
+- Formik et Yup pour la gestion des formulaires
+- React Toastify pour les notifications
+
+## Configuration du projet
+
+### Prérequis
+
+- Node.js (v14 ou supérieur)
+- Compte AWS avec accès à DynamoDB et Cognito
+- Compte Netlify pour le déploiement
+
+### Installation
+
+1. Cloner le dépôt
+```
+git clone <repo-url>
+cd email-sender
+```
+
+2. Installer les dépendances
+```
+npm install
+```
+
+3. Créer un fichier `.env` à la racine du projet avec les informations suivantes :
+```
+REACT_APP_AWS_REGION=<your-aws-region>
+REACT_APP_AWS_ACCESS_KEY=<your-aws-access-key>
+REACT_APP_AWS_SECRET_KEY=<your-aws-secret-key>
+REACT_APP_AWS_USER_POOL_ID=<your-cognito-user-pool-id>
+REACT_APP_AWS_APP_CLIENT_ID=<your-cognito-app-client-id>
+```
+
+4. Lancer l'application en mode développement
+```
+npm start
+```
+
+## Déploiement
+
+L'application est configurée pour être déployée automatiquement sur Netlify. Il suffit de connecter votre dépôt Git à Netlify et le déploiement sera automatisé à chaque push.
+
+La configuration de déploiement est définie dans le fichier `netlify.toml` à la racine du projet.
+
+## Structure du projet
+
+- `src/components` : Composants réutilisables de l'application
+- `src/contexts` : Contextes React pour la gestion de l'état global
+- `src/models` : Modèles de données et fonctions pour interagir avec DynamoDB
+- `src/pages` : Pages de l'application
+- `src/services` : Services pour les fonctionnalités métier
+- `src/utils` : Utilitaires et fonctions d'aide
+
+## Configuration des fournisseurs SMTP
+
+Pour envoyer des emails, vous devez configurer au moins un fournisseur SMTP dans l'application. Vous pouvez configurer plusieurs fournisseurs et choisir celui à utiliser pour chaque campagne.
+
+Les identifiants SMTP sont stockés de manière sécurisée dans DynamoDB et ne sont utilisés que lors de l'envoi d'emails.
+
+## Contribuer
+
+Les contributions sont les bienvenues ! N'hésitez pas à ouvrir une issue ou à soumettre une pull request.
+
+## Licence
+
+Ce projet est sous licence MIT. Voir le fichier LICENSE pour plus d'informations. 
