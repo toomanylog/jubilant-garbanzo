@@ -165,22 +165,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Calculer le SECRET_HASH si un secret client est configuré
       const secretHash = calculateSecretHash(email);
       
-      // Créer les détails d'authentification avec le SECRET_HASH si nécessaire
+      // Créer les détails d'authentification
       const authenticationData: any = {
         Username: email,
         Password: password
       };
       
+      // Ajouter le SECRET_HASH si disponible
       if (secretHash) {
         authenticationData.SecretHash = secretHash;
       }
+      
+      console.log('Paramètres de connexion:', { email, hasSecretHash: !!secretHash });
 
       const authenticationDetails = new AuthenticationDetails(authenticationData);
 
-      const userData = {
+      // Créer l'objet userData avec SecretHash si disponible
+      const userData: any = {
         Username: email,
         Pool: userPool
       };
+      
+      // Ajouter SecretHash directement à userData si disponible
+      if (secretHash) {
+        userData.SecretHash = secretHash;
+      }
 
       const cognitoUser = new CognitoUser(userData);
 
@@ -265,8 +274,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('Tentative d\'inscription avec email:', email);
         console.log('SECRET_HASH disponible:', !!secretHash);
         
-        const signUpOptions = secretHash ? { SecretHash: secretHash } : undefined;
-        console.log('Options d\'inscription:', signUpOptions);
+        // Version correcte pour Cognito avec SECRET_HASH
+        // Créer un objet options avec la propriété SecretHash si disponible
+        const signUpParams: any = {};
+        if (secretHash) {
+          signUpParams.SecretHash = secretHash;
+        }
+        
+        console.log('Paramètres d\'inscription:', signUpParams);
         
         // Version compatible avec la structure attendue par l'API Cognito
         userPool.signUp(email, password, attributeList, [], (err, result) => {
@@ -289,7 +304,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             toast.error('Échec de l\'inscription');
             resolve(false);
           }
-        }, signUpOptions);
+        }, signUpParams);
       });
     } catch (error) {
       console.error('Erreur lors de l\'inscription:', error);
@@ -312,21 +327,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Fonction pour demander la réinitialisation du mot de passe
   const forgotPassword = async (email: string): Promise<boolean> => {
     try {
-      const userData = {
-        Username: email,
-        Pool: userPool
-      };
-
-      const cognitoUser = new CognitoUser(userData);
-      
       // Calculer le SECRET_HASH si un secret client est configuré
       const secretHash = calculateSecretHash(email);
       
-      // Préparer les détails d'authentification avec le SECRET_HASH si nécessaire
+      // Créer un objet userData avec SecretHash si disponible
+      const userData: any = {
+        Username: email,
+        Pool: userPool
+      };
+      
+      // Ajouter SecretHash directement à userData si disponible
       if (secretHash) {
-        // Ajouter le SECRET_HASH directement à l'objet client
-        (cognitoUser as any).client.secretHash = secretHash;
+        userData.SecretHash = secretHash;
       }
+      
+      console.log('Paramètres de réinitialisation:', { email, hasSecretHash: !!secretHash });
+
+      const cognitoUser = new CognitoUser(userData);
 
       return new Promise((resolve, reject) => {
         cognitoUser.forgotPassword({
@@ -351,21 +368,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Fonction pour confirmer la réinitialisation du mot de passe avec le code
   const confirmForgotPassword = async (email: string, code: string, newPassword: string): Promise<boolean> => {
     try {
-      const userData = {
-        Username: email,
-        Pool: userPool
-      };
-
-      const cognitoUser = new CognitoUser(userData);
-      
       // Calculer le SECRET_HASH si un secret client est configuré
       const secretHash = calculateSecretHash(email);
       
-      // Préparer les détails d'authentification avec le SECRET_HASH si nécessaire
+      // Créer un objet userData avec SecretHash si disponible
+      const userData: any = {
+        Username: email,
+        Pool: userPool
+      };
+      
+      // Ajouter SecretHash directement à userData si disponible
       if (secretHash) {
-        // Ajouter le SECRET_HASH directement à l'objet client
-        (cognitoUser as any).client.secretHash = secretHash;
+        userData.SecretHash = secretHash;
       }
+      
+      console.log('Paramètres de confirmation de réinitialisation:', { email, hasSecretHash: !!secretHash });
+
+      const cognitoUser = new CognitoUser(userData);
 
       return new Promise((resolve, reject) => {
         cognitoUser.confirmPassword(code, newPassword, {
