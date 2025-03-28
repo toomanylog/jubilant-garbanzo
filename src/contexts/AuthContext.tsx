@@ -109,10 +109,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
           });
         } else {
+          // Ne pas définir d'erreur si l'utilisateur n'est simplement pas connecté
+          // C'est un état normal, pas une erreur
           setIsAuthenticated(false);
           setCurrentUser(null);
           setIsLoading(false);
-          setError('Utilisateur non connecté');
         }
       } catch (error) {
         console.error('Erreur lors de la vérification de l\'authentification:', error);

@@ -39,7 +39,25 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { currentUser, isLoading } = useAuth();
 
   if (isLoading) {
-    return <div>Chargement...</div>;
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        minHeight: '50vh'
+      }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <div className="animate-pulse flex flex-col items-center">
+            <div className="h-12 w-12 bg-primary/20 rounded-full mb-4 flex items-center justify-center">
+              <div className="h-8 w-8 bg-primary/40 rounded-full"></div>
+            </div>
+            <div className="h-2 w-24 bg-gray-200 rounded mb-2.5"></div>
+            <div className="h-2 w-20 bg-gray-200 rounded"></div>
+          </div>
+        </Box>
+      </Box>
+    );
   }
 
   if (!currentUser) {
@@ -61,7 +79,7 @@ const App: React.FC = () => {
             minHeight: '100vh'
           }}>
             <Navbar />
-            <Box sx={{ flexGrow: 1 }}>
+            <Box sx={{ flexGrow: 1, paddingTop: '64px' }}>
               <Routes>
                 {/* Routes publiques */}
                 <Route path="/login" element={<LoginPage />} />

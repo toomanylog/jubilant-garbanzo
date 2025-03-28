@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
-import { LayoutDashboard, BarChart, Settings, Package, Users, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, BarChart, Settings, Package, Users, LogOut, Menu, X, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 
@@ -29,14 +29,14 @@ const Navbar: React.FC = () => {
   };
 
   return (
-    <nav className="sticky top-0 z-40 w-full border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-      <div className="px-4 sm:px-6 lg:px-8">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center">
+          <div className="flex-shrink-0 flex items-center">
             <Link to="/" className="flex items-center">
-              <LayoutDashboard className="h-6 w-6 text-primary" />
-              <span className="ml-2 text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+              <Eye className="h-8 w-8 text-primary" />
+              <span className="ml-2 text-xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                 NORTH EYES
               </span>
             </Link>
@@ -50,7 +50,7 @@ const Navbar: React.FC = () => {
                   key={item.path}
                   to={item.path}
                   className={cn(
-                    'px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                    'px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center',
                     location.pathname === item.path
                       ? 'bg-primary/10 text-primary'
                       : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800'
