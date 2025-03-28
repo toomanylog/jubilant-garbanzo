@@ -49,7 +49,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
         flexDirection: 'column', 
         alignItems: 'center', 
         justifyContent: 'center',
-        minHeight: '50vh'
+        minHeight: '50vh',
+        mt: 8
       }}>
         <Box sx={{ textAlign: 'center' }}>
           <div className="animate-pulse flex flex-col items-center">
@@ -77,13 +78,9 @@ const App: React.FC = () => {
     <ThemeProvider theme={theme}>
       <AuthProvider>
         <Router>
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            minHeight: '100vh'
-          }}>
+          <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
             <Navbar />
-            <Box sx={{ flexGrow: 1, paddingTop: '64px' }}>
+            <div className="flex-grow mt-16 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
               <Routes>
                 {/* Page d'accueil */}
                 <Route path="/" element={<HomePage />} />
@@ -218,9 +215,9 @@ const App: React.FC = () => {
                 <Route path="/error" element={<ErrorPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
-            </Box>
+            </div>
             <Footer />
-          </Box>
+          </div>
         </Router>
       </AuthProvider>
       <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} />
