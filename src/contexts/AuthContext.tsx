@@ -16,12 +16,22 @@ const clientSecret = process.env.REACT_APP_AWS_APP_CLIENT_SECRET || '';
 // Fonction pour calculer le SECRET_HASH nécessaire si un secret client est configuré
 const calculateSecretHash = (username: string): string | undefined => {
   if (!clientSecret) {
+    console.log('Aucun secret client configuré');
     return undefined;
   }
   
-  const message = username + poolData.ClientId;
-  const hashResult = crypto.HmacSHA256(message, clientSecret);
-  return crypto.enc.Base64.stringify(hashResult);
+  try {
+    // Implémentation standard pour le calcul du SECRET_HASH de Cognito
+    const message = username + poolData.ClientId;
+    const hashResult = crypto.HmacSHA256(message, clientSecret);
+    const hashBase64 = crypto.enc.Base64.stringify(hashResult);
+    
+    console.log('SECRET_HASH calculé avec succès');
+    return hashBase64;
+  } catch (error) {
+    console.error('Erreur lors du calcul du SECRET_HASH:', error);
+    return undefined;
+  }
 };
 
 const userPool = new CognitoUserPool(poolData);
@@ -247,19 +257,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Calculer le SECRET_HASH si un secret client est configuré
         const secretHash = calculateSecretHash(email);
         
-        // Définir les options d'inscription avec SECRET_HASH si nécessaire
+        console.log('Tentative d\'inscription avec email:', email);
+        console.log('SECRET_HASH disponible:', !!secretHash);
+        
         const signUpOptions = secretHash ? { SecretHash: secretHash } : undefined;
-
-        // Effectuer l'inscription avec Cognito
+        console.log('Options d\'inscription:', signUpOptions);
+        
+        // Version compatible avec la structure attendue par l'API Cognito
         userPool.signUp(email, password, attributeList, [], (err, result) => {
           if (err) {
             console.error('Erreur lors de l\'inscription:', err);
+            console.error('Code d\'erreur:', err.code);
+            console.error('Message d\'erreur:', err.message);
             toast.error('Échec de l\'inscription: ' + (err.message || 'Une erreur est survenue'));
             reject(err);
             return;
           }
           
           if (result) {
+            console.log('Inscription réussie, utilisateur:', result.user);
+            console.log('UserConfirmed:', result.userConfirmed);
+            console.log('UserSub:', result.userSub);
             toast.success('Inscription réussie! Veuillez vérifier votre email pour confirmer votre compte.');
             resolve(true);
           } else {
@@ -298,10 +316,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Calculer le SECRET_HASH si un secret client est configuré
       const secretHash = calculateSecretHash(email);
+      
+      // Préparer les détails d'authentification avec le SECRET_HASH si nécessaire
+      if (secretHash) {
+        // Ajouter le SECRET_HASH directement à l'objet client
+        (cognitoUser as any).client.secretHash = secretHash;
+      }
 
       return new Promise((resolve, reject) => {
-        // Configurer les callbacks pour la demande de réinitialisation
-        const callbacks = {
+        cognitoUser.forgotPassword({
           onSuccess: () => {
             toast.success('Code de réinitialisation envoyé à votre email');
             resolve(true);
@@ -311,15 +334,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             toast.error('Échec de la demande: ' + (err.message || 'Une erreur est survenue'));
             reject(err);
           }
-        };
-
-        // Si un secret est configuré, l'ajouter comme propriété de l'utilisateur
-        if (secretHash) {
-          // On doit ajouter la propriété directement à l'objet
-          (cognitoUser as any).client.secretHash = secretHash;
-        }
-
-        cognitoUser.forgotPassword(callbacks);
+        });
       });
     } catch (error) {
       console.error('Erreur lors de la demande de réinitialisation:', error);
@@ -341,9 +356,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Calculer le SECRET_HASH si un secret client est configuré
       const secretHash = calculateSecretHash(email);
       
-      // Si un secret est configuré, l'ajouter comme propriété de l'utilisateur
+      // Préparer les détails d'authentification avec le SECRET_HASH si nécessaire
       if (secretHash) {
-        // On doit ajouter la propriété directement à l'objet
+        // Ajouter le SECRET_HASH directement à l'objet client
         (cognitoUser as any).client.secretHash = secretHash;
       }
 
