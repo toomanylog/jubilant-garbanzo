@@ -150,12 +150,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Calculer le SECRET_HASH si un secret client est configuré
       const secretHash = calculateSecretHash(email);
       
+      // Créer les détails d'authentification avec le SECRET_HASH si nécessaire
       const authenticationData: any = {
         Username: email,
         Password: password
       };
       
-      // Ajouter le SECRET_HASH aux détails d'authentification si nécessaire
       if (secretHash) {
         authenticationData.SecretHash = secretHash;
       }
@@ -220,7 +220,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               }
             });
           },
-          onFailure: (err) => {
+          onFailure: (err: Error) => {
             console.error('Erreur lors de la connexion:', err);
             toast.error('Échec de la connexion: ' + (err.message || 'Vérifiez vos identifiants'));
             reject(err);
@@ -244,12 +244,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           new CognitoUserAttribute({ Name: 'name', Value: fullName })
         ];
 
-        // Ajouter le SECRET_HASH si nécessaire
+        // Calculer le SECRET_HASH si un secret client est configuré
         const secretHash = calculateSecretHash(email);
         
-        // Options de configuration supplémentaires pour la méthode signUp
+        // Définir les options d'inscription avec SECRET_HASH si nécessaire
         const signUpOptions = secretHash ? { SecretHash: secretHash } : undefined;
 
+        // Effectuer l'inscription avec Cognito
         userPool.signUp(email, password, attributeList, [], (err, result) => {
           if (err) {
             console.error('Erreur lors de l\'inscription:', err);
@@ -299,6 +300,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const secretHash = calculateSecretHash(email);
 
       return new Promise((resolve, reject) => {
+        // Configurer les callbacks pour la demande de réinitialisation
         const callbacks = {
           onSuccess: () => {
             toast.success('Code de réinitialisation envoyé à votre email');
@@ -311,10 +313,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         };
 
-        // Ajouter le SECRET_HASH à la requête si nécessaire
+        // Si un secret est configuré, l'ajouter comme propriété de l'utilisateur
         if (secretHash) {
-          cognitoUser.setAuthenticationFlowType('CUSTOM_AUTH');
-          (cognitoUser as any).CLIENT_SECRET_HASH = secretHash;
+          // On doit ajouter la propriété directement à l'objet
+          (cognitoUser as any).client.secretHash = secretHash;
         }
 
         cognitoUser.forgotPassword(callbacks);
@@ -339,10 +341,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Calculer le SECRET_HASH si un secret client est configuré
       const secretHash = calculateSecretHash(email);
       
-      // Ajouter le SECRET_HASH à l'utilisateur si nécessaire
+      // Si un secret est configuré, l'ajouter comme propriété de l'utilisateur
       if (secretHash) {
-        cognitoUser.setAuthenticationFlowType('CUSTOM_AUTH');
-        (cognitoUser as any).CLIENT_SECRET_HASH = secretHash;
+        // On doit ajouter la propriété directement à l'objet
+        (cognitoUser as any).client.secretHash = secretHash;
       }
 
       return new Promise((resolve, reject) => {
