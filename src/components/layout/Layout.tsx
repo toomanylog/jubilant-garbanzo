@@ -1,35 +1,22 @@
 import React, { useState, ReactNode } from 'react';
-import { 
-  AppBar, 
-  Box, 
-  CssBaseline, 
-  Divider, 
-  Drawer, 
-  IconButton, 
-  List, 
-  ListItem, 
-  ListItemButton, 
-  ListItemIcon, 
-  ListItemText, 
-  Toolbar, 
-  Typography, 
-  Button, 
-  useTheme,
-  useMediaQuery
-} from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import EmailIcon from '@mui/icons-material/Email';
-import SettingsIcon from '@mui/icons-material/Settings';
-import CampaignIcon from '@mui/icons-material/Campaign';
-import DescriptionIcon from '@mui/icons-material/Description';
-import LogoutIcon from '@mui/icons-material/Logout';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { 
+  LayoutDashboard,
+  BarChart2,
+  FileText, 
+  Mail,
+  Settings,
+  LogOut,
+  Menu,
+  X,
+  ChevronRight,
+  Eye,
+  User,
+  Bell
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { cn } from '../../lib/utils';
 import { Helmet } from 'react-helmet';
-
-// Largeur du menu latéral
-const drawerWidth = 240;
 
 // Props du composant
 interface LayoutProps {
@@ -43,41 +30,49 @@ const menuItems = [
   { 
     name: 'Tableau de bord', 
     path: '/dashboard', 
-    icon: <DashboardIcon /> 
+    icon: <LayoutDashboard className="h-5 w-5" /> 
   },
   { 
     name: 'Campagnes', 
     path: '/campaigns', 
-    icon: <CampaignIcon /> 
+    icon: <BarChart2 className="h-5 w-5" /> 
   },
   { 
     name: 'Templates', 
     path: '/templates', 
-    icon: <DescriptionIcon /> 
+    icon: <FileText className="h-5 w-5" /> 
   },
   { 
-    name: 'Fournisseurs SMTP', 
+    name: 'SMTP', 
     path: '/smtp-providers', 
-    icon: <EmailIcon /> 
+    icon: <Mail className="h-5 w-5" /> 
   },
   { 
     name: 'Paramètres', 
     path: '/settings', 
-    icon: <SettingsIcon /> 
+    icon: <Settings className="h-5 w-5" /> 
   }
 ];
 
-const Layout: React.FC<LayoutProps> = ({ children, title = 'North Eyes', description = 'Plateforme d\'envoi d\'emails professionnels' }) => {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+const Layout: React.FC<LayoutProps> = ({ 
+  children, 
+  title = 'North Eyes', 
+  description = 'Plateforme d\'envoi d\'emails professionnels' 
+}) => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const { isAuthenticated, logout, currentUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   // Gestion de l'ouverture/fermeture du menu mobile
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  // Réduire/étendre le menu latéral sur desktop
+  const toggleCollapse = () => {
+    setCollapsed(!collapsed);
   };
 
   // Gestion de la déconnexion
@@ -86,135 +81,226 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'North Eyes', descrip
     navigate('/login');
   };
 
-  // Contenu du menu latéral
-  const drawer = (
-    <div>
-      <Toolbar>
-        <Typography variant="h6" noWrap component="div">
-          North Eyes
-        </Typography>
-      </Toolbar>
-      <Divider />
-      <List>
-        {menuItems.map((item) => (
-          <ListItem key={item.path} disablePadding>
-            <ListItemButton 
-              component={Link} 
-              to={item.path}
-              selected={location.pathname === item.path}
-            >
-              <ListItemIcon>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.name} />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
-      <Divider />
-      <List>
-        <ListItem disablePadding>
-          <ListItemButton onClick={handleLogout}>
-            <ListItemIcon>
-              <LogoutIcon />
-            </ListItemIcon>
-            <ListItemText primary="Déconnexion" />
-          </ListItemButton>
-        </ListItem>
-      </List>
-    </div>
-  );
-
   // Si l'utilisateur n'est pas authentifié, afficher uniquement le contenu
   if (!isAuthenticated) {
     return <>{children}</>;
   }
 
   return (
-    <Box sx={{ display: 'flex' }}>
-      <CssBaseline />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Helmet>
         <title>{`${title} | North Eyes`}</title>
         <meta name="description" content={description} />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Helmet>
-      <AppBar
-        position="fixed"
-        sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
-          boxShadow: isMobile ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
-        }}
+
+      {/* Sidebar pour mobile - s'affiche en overlay */}
+      <div 
+        className={cn(
+          "fixed inset-0 z-50 bg-gray-800/50 dark:bg-gray-900/80 lg:hidden",
+          sidebarOpen ? "block" : "hidden"
+        )}
+        onClick={toggleSidebar}
+      />
+
+      {/* Sidebar pour mobile */}
+      <aside 
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-gray-800 shadow-xl transition-transform duration-300 lg:hidden",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
       >
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: 'none' } }}
+        <div className="flex h-16 items-center justify-between px-4 border-b border-gray-200 dark:border-gray-700">
+          <Link to="/dashboard" className="flex items-center" onClick={() => setSidebarOpen(false)}>
+            <Eye className="h-7 w-7 text-primary" />
+            <span className="ml-2.5 text-lg font-extrabold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              NORTH EYES
+            </span>
+          </Link>
+          <button
+            onClick={toggleSidebar}
+            className="rounded-md p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
           >
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            {title}
-          </Typography>
-          {isAuthenticated && (
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Typography variant="body1" sx={{ mr: 2 }}>
-                {currentUser?.fullName}
-              </Typography>
-              <Button color="inherit" onClick={handleLogout}>
-                Déconnexion
-              </Button>
-            </Box>
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="py-4 overflow-y-auto">
+          <div className="px-3 pb-4 mb-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center px-3.5 py-2.5">
+              <div className="flex-shrink-0">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                  <User className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="ml-3 min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  {currentUser?.fullName}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {currentUser?.email}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <nav className="space-y-1 px-3">
+            {menuItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={cn(
+                  "flex items-center px-3 py-2.5 text-sm font-medium rounded-lg group",
+                  location.pathname === item.path || location.pathname.startsWith(item.path + '/')
+                    ? "bg-primary/10 text-primary"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700/50"
+                )}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <span className="mr-3">{item.icon}</span>
+                <span className="flex-1">{item.name}</span>
+                {(location.pathname === item.path || location.pathname.startsWith(item.path + '/')) && (
+                  <ChevronRight className="h-4 w-4 opacity-70" />
+                )}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="px-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={handleLogout}
+              className="flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+            >
+              <LogOut className="h-5 w-5 mr-3" />
+              Déconnexion
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Sidebar pour desktop */}
+      <aside 
+        className={cn(
+          "fixed inset-y-0 left-0 z-30 hidden lg:block bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-300",
+          collapsed ? "w-20" : "w-64"
+        )}
+      >
+        <div className="flex h-16 items-center justify-between px-4 border-b border-gray-200 dark:border-gray-700">
+          <Link to="/dashboard" className="flex items-center">
+            <Eye className="h-7 w-7 text-primary" />
+            {!collapsed && (
+              <span className="ml-2.5 text-lg font-extrabold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                NORTH EYES
+              </span>
+            )}
+          </Link>
+          <button
+            onClick={toggleCollapse}
+            className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+          >
+            <ChevronRight className={cn("h-4 w-4 transition-transform", collapsed ? "rotate-180" : "")} />
+          </button>
+        </div>
+
+        <div className="py-4 overflow-y-auto">
+          {!collapsed && (
+            <div className="px-3 pb-4 mb-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center px-3 py-2.5">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <User className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="ml-3 min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {currentUser?.fullName}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {currentUser?.email}
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
-        </Toolbar>
-      </AppBar>
-      <Box
-        component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-      >
-        {/* Menu pour mobile */}
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true, // Pour une meilleure performance sur mobile
-          }}
-          sx={{
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
-          }}
-        >
-          {drawer}
-        </Drawer>
-        {/* Menu pour desktop */}
-        <Drawer
-          variant="permanent"
-          sx={{
-            display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
-          }}
-          open
-        >
-          {drawer}
-        </Drawer>
-      </Box>
-      <Box
-        component="main"
-        sx={{ 
-          flexGrow: 1, 
-          p: 3, 
-          width: { sm: `calc(100% - ${drawerWidth}px)` } ,
-          marginTop: '64px' // Hauteur de la barre d'outils
-        }}
-      >
-        {children}
-      </Box>
-    </Box>
+
+          <nav className="space-y-1 px-3">
+            {menuItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={cn(
+                  "flex items-center py-2.5 text-sm font-medium rounded-lg group",
+                  collapsed ? "justify-center px-2.5" : "px-3",
+                  location.pathname === item.path || location.pathname.startsWith(item.path + '/')
+                    ? "bg-primary/10 text-primary"
+                    : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700/50"
+                )}
+              >
+                <span className={collapsed ? "" : "mr-3"}>{item.icon}</span>
+                {!collapsed && <span className="flex-1">{item.name}</span>}
+                {!collapsed && (location.pathname === item.path || location.pathname.startsWith(item.path + '/')) && (
+                  <ChevronRight className="h-4 w-4 opacity-70" />
+                )}
+              </Link>
+            ))}
+          </nav>
+
+          <div className={cn(
+            "mt-6 pt-4 border-t border-gray-200 dark:border-gray-700",
+            collapsed ? "px-2" : "px-3"
+          )}>
+            <button
+              onClick={handleLogout}
+              className={cn(
+                "flex items-center py-2.5 text-sm font-medium rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20",
+                collapsed ? "justify-center px-2.5" : "w-full px-3"
+              )}
+              title="Déconnexion"
+            >
+              <LogOut className={cn("h-5 w-5", collapsed ? "" : "mr-3")} />
+              {!collapsed && <span>Déconnexion</span>}
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Header pour mobile et contenu principal */}
+      <div className={cn(
+        "flex flex-col min-h-screen transition-all duration-300",
+        collapsed ? "lg:pl-20" : "lg:pl-64"
+      )}>
+        <header className="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 lg:border-none">
+          <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:hidden">
+            <button
+              onClick={toggleSidebar}
+              className="text-gray-700 hover:bg-gray-100 p-2 rounded-md dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+            
+            <div className="flex items-center">
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {title}
+              </h1>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <button className="text-gray-500 hover:bg-gray-100 p-2 rounded-full dark:text-gray-400 dark:hover:bg-gray-700">
+                <Bell className="h-5 w-5" />
+              </button>
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <User className="h-4 w-4" />
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8">
+          {children}
+        </main>
+      </div>
+    </div>
   );
 };
 
