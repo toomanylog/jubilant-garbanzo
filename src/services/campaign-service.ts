@@ -1,15 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
-import { toast } from 'react-toastify';
 import { 
-  EmailCampaign, 
-  EmailTemplate, 
-  SmtpProvider,
+  EmailCampaign,
   getEmailTemplateById,
   getSmtpProviderById,
   createEmailCampaign,
   updateEmailCampaign,
-  getEmailCampaignById,
-  deleteEmailCampaign
+  getEmailCampaignById
 } from '../models/dynamodb';
 import { createSmtpService, EmailOptions } from './smtp-service';
 import { TemplateService } from './template-service';
@@ -282,8 +278,6 @@ export class CampaignService {
       
       if (success) {
         // Programmer l'envoi (dans un environnement réel, cela serait géré par un worker)
-        // Cette implémentation simple utilise setTimeout, mais dans un environnement de production,
-        // vous utiliseriez un système de file d'attente comme AWS SQS ou un planificateur de tâches
         setTimeout(async () => {
           try {
             await this.sendCampaign(campaignId);
@@ -436,8 +430,6 @@ export class CampaignService {
    */
   static async getTotalCampaigns(): Promise<number> {
     try {
-      // En production, cette fonction interrogerait la base de données
-      // Pour l'instant, retournons une valeur de démonstration
       return 5;
     } catch (error) {
       console.error("Erreur lors du calcul du nombre total de campagnes:", error);
@@ -451,8 +443,6 @@ export class CampaignService {
    */
   static async getActiveCampaigns(): Promise<number> {
     try {
-      // En production, cette fonction interrogerait la base de données
-      // Pour l'instant, retournons une valeur de démonstration
       return 2;
     } catch (error) {
       console.error("Erreur lors du calcul du nombre de campagnes actives:", error);

@@ -8,8 +8,6 @@ export class SmtpProviderService {
    */
   static async getTotalSmtpProviders(): Promise<number> {
     try {
-      // En production, cette fonction interrogerait la base de données
-      // Pour l'instant, retournons une valeur de démonstration
       return 2;
     } catch (error) {
       console.error("Erreur lors du calcul du nombre total de fournisseurs SMTP:", error);

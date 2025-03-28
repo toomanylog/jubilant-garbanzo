@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -37,13 +37,13 @@ const TemplatePreview: React.FC = () => {
   const [viewMode, setViewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   
   // Pour la démo, des exemples de variables
-  const demoVariables = {
+  const demoVariables = useMemo(() => ({
     name: 'Jean Dupont',
     email: 'jean.dupont@example.com',
     company: 'Acme Inc.',
     unsubscribe_link: 'https://example.com/unsubscribe',
     date: new Date().toLocaleDateString(),
-  };
+  }), []);
 
   useEffect(() => {
     const fetchTemplate = async () => {

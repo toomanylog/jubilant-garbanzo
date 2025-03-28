@@ -114,8 +114,6 @@ export class TemplateService {
    */
   static async getTotalTemplates(): Promise<number> {
     try {
-      // En production, cette fonction interrogerait la base de données
-      // Pour l'instant, retournons une valeur de démonstration
       return 3;
     } catch (error) {
       console.error("Erreur lors du calcul du nombre total de templates:", error);
