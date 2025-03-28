@@ -11,6 +11,12 @@ const awsConfig = {
   }
 };
 
+// Log de débogage pour vérifier les identifiants AWS
+console.log('⚠️ Configuration AWS:');
+console.log('- Région:', awsConfig.region);
+console.log('- Access Key disponible:', !!awsConfig.credentials.accessKeyId);
+console.log('- Secret Key disponible:', !!awsConfig.credentials.secretAccessKey);
+
 // Configuration d'AWS SDK pour DynamoDB
 AWS.config.update(awsConfig);
 
@@ -28,5 +34,8 @@ Amplify.configure({
 
 // Export de DynamoDB pour une utilisation dans l'application
 export const dynamoDB = new AWS.DynamoDB.DocumentClient();
+
+// Log de débogage pour vérifier la connectivité à DynamoDB
+console.log('⚠️ DynamoDB client initialisé');
 
 export default awsConfig; 

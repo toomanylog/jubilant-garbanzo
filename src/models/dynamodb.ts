@@ -114,6 +114,8 @@ export const getUser = getUserById;
 // Fournisseurs SMTP
 export const getSmtpProvidersByUserId = async (userId: string): Promise<SmtpProvider[]> => {
   try {
+    console.log('⚠️ DEBUG getSmtpProvidersByUserId - userId:', userId);
+    
     const params = {
       TableName: 'SmtpProviders',
       IndexName: 'UserIdIndex',
@@ -123,25 +125,35 @@ export const getSmtpProvidersByUserId = async (userId: string): Promise<SmtpProv
       }
     };
     
+    console.log('⚠️ DEBUG getSmtpProvidersByUserId - params:', JSON.stringify(params));
+    
     const result = await dynamoDB.query(params).promise();
+    console.log('⚠️ DEBUG getSmtpProvidersByUserId - result:', JSON.stringify(result));
+    
     return result.Items as SmtpProvider[] || [];
   } catch (error) {
-    console.error('Erreur lors de la récupération des fournisseurs SMTP:', error);
+    console.error('⚠️ ERROR getSmtpProvidersByUserId:', error);
     return [];
   }
 };
 
 export const createSmtpProvider = async (provider: SmtpProvider): Promise<boolean> => {
   try {
+    console.log('⚠️ DEBUG createSmtpProvider - provider:', JSON.stringify(provider));
+    
     const params = {
       TableName: 'SmtpProviders',
       Item: provider
     };
     
+    console.log('⚠️ DEBUG createSmtpProvider - params:', JSON.stringify(params));
+    
     await dynamoDB.put(params).promise();
+    console.log('⚠️ DEBUG createSmtpProvider - Opération réussie');
+    
     return true;
   } catch (error) {
-    console.error('Erreur lors de la création du fournisseur SMTP:', error);
+    console.error('⚠️ ERROR createSmtpProvider:', error);
     return false;
   }
 };
