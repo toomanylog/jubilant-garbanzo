@@ -1,5 +1,7 @@
 # North Eyes
 
+[![Netlify Status](https://api.netlify.com/api/v1/badges/270ff9ab-02f1-4a28-909b-abab81bc1b86/deploy-status)](https://app.netlify.com/sites/northeyes/deploys)
+
 Une application web moderne pour la gestion et l'envoi d'emails personnalisés. Construite avec React, TypeScript et Tailwind CSS.
 
 ## Fonctionnalités
@@ -34,7 +36,7 @@ Une application web moderne pour la gestion et l'envoi d'emails personnalisés. 
 
 1. Clonez le dépôt
 ```bash
-git clone https://github.com/votre-utilisateur/north-eyes.git
+git clone https://github.com/toomanylog/north-eyes.git
 cd north-eyes
 ```
 
