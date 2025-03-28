@@ -15,6 +15,7 @@ import HelpPage from './pages/help/HelpPage';
 import CookiesPage from './pages/legal/CookiesPage';
 
 // Pages
+import HomePage from './pages/home/HomePage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
@@ -82,6 +83,9 @@ const App: React.FC = () => {
             <Navbar />
             <Box sx={{ flexGrow: 1, paddingTop: '64px' }}>
               <Routes>
+                {/* Page d'accueil */}
+                <Route path="/" element={<HomePage />} />
+                
                 {/* Routes publiques */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
@@ -95,7 +99,7 @@ const App: React.FC = () => {
                 
                 {/* Routes protégées */}
                 <Route 
-                  path="/" 
+                  path="/dashboard" 
                   element={
                     <ProtectedRoute>
                       <DashboardPage />

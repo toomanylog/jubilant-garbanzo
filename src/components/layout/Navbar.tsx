@@ -18,7 +18,7 @@ const Navbar: React.FC = () => {
   };
 
   const menuItems = [
-    { name: 'Tableau de bord', path: '/', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { name: 'Tableau de bord', path: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { name: 'Campagnes', path: '/campaigns', icon: <BarChart className="w-5 h-5" /> },
     { name: 'Templates', path: '/templates', icon: <Package className="w-5 h-5" /> },
     { name: 'Fournisseurs SMTP', path: '/smtp-providers', icon: <Users className="w-5 h-5" /> },
@@ -34,7 +34,7 @@ const Navbar: React.FC = () => {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <div className="flex-shrink-0 flex items-center">
-            <Link to="/" className="flex items-center">
+            <Link to={isAuthenticated ? '/dashboard' : '/'} className="flex items-center">
               <Eye className="h-8 w-8 text-primary" />
               <span className="ml-2 text-xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                 NORTH EYES
