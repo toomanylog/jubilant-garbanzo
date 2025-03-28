@@ -19,6 +19,7 @@ import HomePage from './pages/home/HomePage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ConfirmSignUpPage from './pages/auth/ConfirmSignUpPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import SmtpProviderList from './pages/smtp-providers/SmtpProviderList';
 import SmtpProviderForm from './pages/smtp-providers/SmtpProviderForm';
@@ -90,6 +91,7 @@ const App: React.FC = () => {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/confirm-signup" element={<ConfirmSignUpPage />} />
                 
                 {/* Pages légales et aide */}
                 <Route path="/legal/terms" element={<TermsPage />} />

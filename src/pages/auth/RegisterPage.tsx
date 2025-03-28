@@ -45,7 +45,7 @@ const RegisterPage: React.FC = () => {
       const success = await register(values.email, values.fullName, values.password);
       
       if (success) {
-        navigate('/dashboard');
+        navigate(`/confirm-signup?email=${encodeURIComponent(values.email)}`);
       } else {
         setRegisterError('Échec de l\'inscription. Veuillez réessayer ultérieurement.');
       }
@@ -250,6 +250,11 @@ const RegisterPage: React.FC = () => {
                     </>
                   )}
                 </Button>
+              </div>
+              
+              <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
+                En vous inscrivant, vous recevrez un code de confirmation par email.
+                Vous devrez valider votre compte avec ce code avant de pouvoir vous connecter.
               </div>
             </form>
 

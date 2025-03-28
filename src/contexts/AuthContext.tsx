@@ -50,10 +50,11 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (email: string, password: string, fullName: string) => Promise<boolean>;
+  register: (email: string, fullName: string, password: string) => Promise<boolean>;
   logout: () => void;
   forgotPassword: (email: string) => Promise<boolean>;
   confirmForgotPassword: (email: string, code: string, newPassword: string) => Promise<boolean>;
+  confirmSignUp: (email: string, code: string) => Promise<boolean>;
 }
 
 // Création du contexte
@@ -361,6 +362,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Fonction pour confirmer l'inscription avec le code
+  const confirmSignUp = async (email: string, code: string): Promise<boolean> => {
+    try {
+      const userData = {
+        Username: email,
+        Pool: userPool
+      };
+
+      const cognitoUser = new CognitoUser(userData);
+
+      return new Promise((resolve, reject) => {
+        cognitoUser.confirmRegistration(code, true, (err, result) => {
+          if (err) {
+            console.error('Erreur lors de la confirmation du compte:', err);
+            toast.error('Échec de la confirmation: ' + (err.message || 'Une erreur est survenue'));
+            reject(err);
+            return;
+          }
+          
+          toast.success('Compte confirmé avec succès! Vous pouvez maintenant vous connecter.');
+          resolve(true);
+        });
+      });
+    } catch (error) {
+      console.error('Erreur lors de la confirmation du compte:', error);
+      toast.error('Échec de la confirmation du compte');
+      return false;
+    }
+  };
+
   // Valeurs du contexte
   const value = {
     currentUser,
@@ -371,7 +402,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     register,
     logout,
     forgotPassword,
-    confirmForgotPassword
+    confirmForgotPassword,
+    confirmSignUp
   };
 
   return (

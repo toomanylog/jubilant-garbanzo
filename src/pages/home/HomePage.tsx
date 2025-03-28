@@ -185,7 +185,7 @@ const HomePage: React.FC = () => {
                       className={`px-4 py-2 text-sm font-medium rounded-lg ${activeTab === index ? 'bg-purple-100 text-purple-700' : 'text-gray-600 hover:bg-gray-100'}`}
                       onClick={() => setActiveTab(index)}
                     >
-                      {tab.title.split(' ')[1]}
+                      {index === 0 ? "d'expéditeurs" : index === 1 ? "de SMTP" : "de templates"}
                     </button>
                   ))}
                 </div>
