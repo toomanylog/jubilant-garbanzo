@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation Template pour créer les tables DynamoDB de l''application North Eyes'
+
+Resources:
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Users
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+
+  SmtpProvidersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: SmtpProviders
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: providerId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: providerId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIdIndex
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  EmailTemplatesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: EmailTemplates
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: templateId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: templateId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIdIndex
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  EmailCampaignsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: EmailCampaigns
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: campaignId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: campaignId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIdIndex
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+Outputs:
+  UsersTableArn:
+    Description: ARN de la table Users
+    Value: !GetAtt UsersTable.Arn
+  
+  SmtpProvidersTableArn:
+    Description: ARN de la table SmtpProviders
+    Value: !GetAtt SmtpProvidersTable.Arn
+  
+  EmailTemplatesTableArn:
+    Description: ARN de la table EmailTemplates
+    Value: !GetAtt EmailTemplatesTable.Arn
+  
+  EmailCampaignsTableArn:
+    Description: ARN de la table EmailCampaigns
+    Value: !GetAtt EmailCampaignsTable.Arn 
