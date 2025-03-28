@@ -14,7 +14,11 @@ const validationSchema = Yup.object({
     .email('Email invalide')
     .required('L\'email est requis'),
   password: Yup.string()
-    .min(6, 'Le mot de passe doit contenir au moins 6 caractères')
+    .min(8, 'Le mot de passe doit contenir au moins 8 caractères')
+    .matches(/[A-Z]/, 'Le mot de passe doit contenir au moins une lettre majuscule')
+    .matches(/[a-z]/, 'Le mot de passe doit contenir au moins une lettre minuscule')
+    .matches(/[0-9]/, 'Le mot de passe doit contenir au moins un chiffre')
+    .matches(/[^A-Za-z0-9]/, 'Le mot de passe doit contenir au moins un caractère spécial')
     .required('Le mot de passe est requis'),
   confirmPassword: Yup.string()
     .oneOf([Yup.ref('password')], 'Les mots de passe ne correspondent pas')
@@ -157,6 +161,44 @@ const RegisterPage: React.FC = () => {
                 {formik.touched.password && formik.errors.password ? (
                   <p className="mt-2 text-sm text-red-600 dark:text-red-400">{formik.errors.password}</p>
                 ) : null}
+                
+                <div className="mt-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Le mot de passe doit contenir au moins :
+                  </p>
+                  <ul className="mt-1 text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                    <li className={`flex items-center ${formik.values.password.length >= 8 ? 'text-green-500 dark:text-green-400' : ''}`}>
+                      <span className={`mr-1 ${formik.values.password.length >= 8 ? 'text-green-500 dark:text-green-400' : ''}`}>
+                        {formik.values.password.length >= 8 ? '✓' : '○'}
+                      </span>
+                      8 caractères
+                    </li>
+                    <li className={`flex items-center ${/[A-Z]/.test(formik.values.password) ? 'text-green-500 dark:text-green-400' : ''}`}>
+                      <span className={`mr-1 ${/[A-Z]/.test(formik.values.password) ? 'text-green-500 dark:text-green-400' : ''}`}>
+                        {/[A-Z]/.test(formik.values.password) ? '✓' : '○'}
+                      </span>
+                      Une lettre majuscule
+                    </li>
+                    <li className={`flex items-center ${/[a-z]/.test(formik.values.password) ? 'text-green-500 dark:text-green-400' : ''}`}>
+                      <span className={`mr-1 ${/[a-z]/.test(formik.values.password) ? 'text-green-500 dark:text-green-400' : ''}`}>
+                        {/[a-z]/.test(formik.values.password) ? '✓' : '○'}
+                      </span>
+                      Une lettre minuscule
+                    </li>
+                    <li className={`flex items-center ${/[0-9]/.test(formik.values.password) ? 'text-green-500 dark:text-green-400' : ''}`}>
+                      <span className={`mr-1 ${/[0-9]/.test(formik.values.password) ? 'text-green-500 dark:text-green-400' : ''}`}>
+                        {/[0-9]/.test(formik.values.password) ? '✓' : '○'}
+                      </span>
+                      Un chiffre
+                    </li>
+                    <li className={`flex items-center ${/[^A-Za-z0-9]/.test(formik.values.password) ? 'text-green-500 dark:text-green-400' : ''}`}>
+                      <span className={`mr-1 ${/[^A-Za-z0-9]/.test(formik.values.password) ? 'text-green-500 dark:text-green-400' : ''}`}>
+                        {/[^A-Za-z0-9]/.test(formik.values.password) ? '✓' : '○'}
+                      </span>
+                      Un caractère spécial
+                    </li>
+                  </ul>
+                </div>
               </div>
 
               <div>

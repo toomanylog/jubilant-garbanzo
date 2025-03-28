@@ -237,7 +237,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // Fonction d'inscription
-  const register = async (email: string, password: string, fullName: string): Promise<boolean> => {
+  const register = async (email: string, fullName: string, password: string): Promise<boolean> => {
     try {
       return new Promise((resolve, reject) => {
         // Attributs de l'utilisateur
@@ -252,7 +252,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.error('Erreur lors de l\'inscription:', err);
             console.error('Code d\'erreur:', (err as CognitoError).code);
             console.error('Message d\'erreur:', err.message);
-            toast.error('Échec de l\'inscription: ' + (err.message || 'Une erreur est survenue'));
+            
+            // Messages d'erreur plus explicites selon le type d'erreur
+            if (err.name === 'InvalidPasswordException') {
+              const message = "Le mot de passe ne respecte pas les exigences de sécurité : au moins 8 caractères, avec majuscules, minuscules, chiffres et caractères spéciaux."
+              setError(message);
+              toast.error(message);
+            } else if (err.name === 'UsernameExistsException') {
+              const message = "Cette adresse email est déjà utilisée par un autre compte.";
+              setError(message);
+              toast.error(message);
+            } else {
+              setError(err.message);
+              toast.error('Échec de l\'inscription: ' + (err.message || 'Une erreur est survenue'));
+            }
+            
             reject(err);
             return;
           }
