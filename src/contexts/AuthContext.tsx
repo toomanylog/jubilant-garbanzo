@@ -4,6 +4,11 @@ import { toast } from 'react-toastify';
 import { createUser, getUserById, User } from '../models/dynamodb';
 import * as crypto from 'crypto-js';
 
+// Interface pour les erreurs Cognito qui contiennent des propriétés supplémentaires
+interface CognitoError extends Error {
+  code?: string;
+}
+
 // Configuration de Cognito
 const poolData = {
   UserPoolId: process.env.REACT_APP_AWS_USER_POOL_ID || '',
@@ -230,7 +235,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               }
             });
           },
-          onFailure: (err: Error) => {
+          onFailure: (err: CognitoError) => {
             console.error('Erreur lors de la connexion:', err);
             toast.error('Échec de la connexion: ' + (err.message || 'Vérifiez vos identifiants'));
             reject(err);
@@ -267,7 +272,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         userPool.signUp(email, password, attributeList, [], (err, result) => {
           if (err) {
             console.error('Erreur lors de l\'inscription:', err);
-            console.error('Code d\'erreur:', err.code);
+            console.error('Code d\'erreur:', (err as CognitoError).code);
             console.error('Message d\'erreur:', err.message);
             toast.error('Échec de l\'inscription: ' + (err.message || 'Une erreur est survenue'));
             reject(err);
@@ -329,7 +334,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             toast.success('Code de réinitialisation envoyé à votre email');
             resolve(true);
           },
-          onFailure: (err: Error) => {
+          onFailure: (err: CognitoError) => {
             console.error('Erreur lors de la demande de réinitialisation:', err);
             toast.error('Échec de la demande: ' + (err.message || 'Une erreur est survenue'));
             reject(err);
@@ -368,7 +373,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             toast.success('Mot de passe réinitialisé avec succès');
             resolve(true);
           },
-          onFailure: (err: Error) => {
+          onFailure: (err: CognitoError) => {
             console.error('Erreur lors de la confirmation de réinitialisation:', err);
             toast.error('Échec de la réinitialisation: ' + (err.message || 'Une erreur est survenue'));
             reject(err);
