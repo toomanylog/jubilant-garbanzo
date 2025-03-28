@@ -137,14 +137,14 @@ const Navbar: React.FC = () => {
       
       {/* Mobile menu */}
       {isMenuOpen && (
-        <div className="md:hidden">
-          <div className="space-y-1 px-2 pb-3 pt-2">
+        <div className="md:hidden h-screen overflow-y-auto bg-white dark:bg-gray-900">
+          <div className="space-y-1 p-3 pb-6">
             {menuItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  'block px-3 py-2 text-base font-medium rounded-md',
+                  'flex items-center px-4 py-3 text-base font-medium rounded-md',
                   location.pathname === item.path
                     ? 'bg-primary/10 text-primary'
                     : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800'
@@ -156,23 +156,23 @@ const Navbar: React.FC = () => {
               </Link>
             ))}
             
-            <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+            <div className="border-t border-gray-200 pt-4 mt-4 dark:border-gray-700">
               {isAuthenticated ? (
                 <>
                   <Link
                     to="/profile"
-                    className="flex items-center px-3 py-2 text-base font-medium text-gray-700 rounded-md hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+                    className="flex items-center px-4 py-3 text-base font-medium text-gray-700 rounded-md hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
                     onClick={toggleMenu}
                   >
-                    <Users className="h-5 w-5 mr-2" />
+                    <Users className="h-5 w-5 mr-3" />
                     Profile
                   </Link>
                   <Link
                     to="/settings"
-                    className="flex items-center px-3 py-2 text-base font-medium text-gray-700 rounded-md hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+                    className="flex items-center px-4 py-3 text-base font-medium text-gray-700 rounded-md hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
                     onClick={toggleMenu}
                   >
-                    <Settings className="h-5 w-5 mr-2" />
+                    <Settings className="h-5 w-5 mr-3" />
                     Settings
                   </Link>
                   <button
@@ -180,24 +180,24 @@ const Navbar: React.FC = () => {
                       handleLogout();
                       toggleMenu();
                     }}
-                    className="flex w-full items-center px-3 py-2 text-base font-medium text-red-600 rounded-md hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+                    className="flex w-full items-center px-4 py-3 text-base font-medium text-red-600 rounded-md hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
                   >
-                    <LogOut className="h-5 w-5 mr-2" />
+                    <LogOut className="h-5 w-5 mr-3" />
                     Logout
                   </button>
                 </>
               ) : (
-                <div className="flex flex-col space-y-2 px-3">
+                <div className="flex flex-col space-y-3 px-4 py-2">
                   <Link
                     to="/login"
-                    className="flex justify-center rounded-md bg-white px-3 py-2 text-base font-medium text-primary shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:ring-gray-700 dark:hover:bg-gray-700"
+                    className="flex justify-center py-3 text-base font-medium text-primary bg-white rounded-md shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:ring-gray-700 dark:hover:bg-gray-700"
                     onClick={toggleMenu}
                   >
                     Login
                   </Link>
                   <Link
                     to="/register"
-                    className="flex justify-center rounded-md bg-primary px-3 py-2 text-base font-medium text-white shadow-sm hover:bg-primary/90"
+                    className="flex justify-center py-3 text-base font-medium text-white bg-primary rounded-md shadow-sm hover:bg-primary/90"
                     onClick={toggleMenu}
                   >
                     Register

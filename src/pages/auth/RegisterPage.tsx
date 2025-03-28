@@ -49,7 +49,7 @@ const RegisterPage: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
           <h2 className="text-3xl font-extrabold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
@@ -60,8 +60,8 @@ const RegisterPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="bg-white dark:bg-gray-800 py-8 px-4 shadow-xl sm:rounded-lg sm:px-10 border border-gray-200 dark:border-gray-700 transition-all hover:shadow-lg">
+        <div className="mt-8">
+          <div className="bg-white dark:bg-gray-800 py-6 px-4 sm:py-8 sm:px-10 shadow-xl rounded-lg border border-gray-200 dark:border-gray-700 transition-all hover:shadow-lg">
             {(registerError || error) && (
               <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md text-red-600 dark:text-red-300 text-sm">
                 <p>{registerError || error}</p>
