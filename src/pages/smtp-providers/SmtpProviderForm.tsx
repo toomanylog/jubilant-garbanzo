@@ -32,7 +32,8 @@ import {
   DialogContent,
   DialogActions,
   RadioGroup,
-  Radio
+  Radio,
+  Checkbox
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import { useFormik } from 'formik';
@@ -107,11 +108,6 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
-  // États pour la gestion des expéditeurs
-  const [openSenderDialog, setOpenSenderDialog] = useState(false);
-  const [currentSender, setCurrentSender] = useState<SmtpSender | null>(null);
-  const [isEditingSender, setIsEditingSender] = useState(false);
-
   // Pour debugger les valeurs initiales
   console.log('⚠️ DEBUG SmtpProviderForm - initialValues:', initialValues);
 
@@ -127,66 +123,64 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
     region: 'us-east-1',
     isDefault: false,
     requiresTls: true,
-    senders: [] as SmtpSender[],
-    senderRotationEnabled: false,
-    senderRotationType: 'sequential' as 'sequential' | 'random'
+    sendingRatePerSecond: 0,
+    sendingRatePerMinute: 0,
+    sendingRatePerHour: 0,
+    sendingRatePerDay: 0,
+    dailyQuota: 0,
+    priority: 1,
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
 
   // Schéma de validation
   const validationSchema = Yup.object().shape({
     name: Yup.string().required('Le nom est requis'),
-    providerType: Yup.string().required('Le type de fournisseur est requis'),
-    host: Yup.string().when('providerType', {
-      is: (val: string) => ['custom_smtp', 'office365'].includes(val),
-      then: () => Yup.string().required('Le nom d\'hôte est requis')
+    providerType: Yup.string().required('Le type de provider est requis'),
+    host: Yup.string().when('providerType', (providerType: any, schema: any) => {
+      return providerType === 'custom_smtp' ? schema.required('L\'hôte SMTP est requis') : schema;
     }),
-    port: Yup.string().when('providerType', {
-      is: (val: string) => ['custom_smtp', 'office365'].includes(val),
-      then: () => Yup.string().required('Le port est requis')
+    port: Yup.number().when('providerType', (providerType: any, schema: any) => {
+      return providerType === 'custom_smtp' ? schema.required('Le port est requis') : schema;
     }),
-    username: Yup.string().when('providerType', {
-      is: (val: string) => ['custom_smtp', 'office365', 'aws_ses', 'mailjet'].includes(val),
-      then: () => Yup.string().required('Le nom d\'utilisateur est requis')
+    username: Yup.string().when('providerType', (providerType: any, schema: any) => {
+      return ['custom_smtp', 'office365'].includes(providerType) 
+        ? schema.required('Le nom d\'utilisateur est requis') 
+        : schema;
     }),
-    password: Yup.string().when(['providerType', 'isEditing'], {
-      is: (providerType: string, editing: boolean) => 
-        ['custom_smtp', 'office365', 'aws_ses', 'mailjet'].includes(providerType) && !editing,
-      then: () => Yup.string().required('Le mot de passe est requis')
+    password: Yup.string().when('providerType', (providerType: any, schema: any) => {
+      return ['custom_smtp', 'office365'].includes(providerType) 
+        ? schema.required('Le mot de passe est requis') 
+        : schema;
     }),
-    apiKey: Yup.string().when('providerType', {
-      is: (val: string) => val === 'sendgrid',
-      then: () => Yup.string().required('La clé API est requise')
+    apiKey: Yup.string().when('providerType', (providerType: any, schema: any) => {
+      return ['sendgrid', 'mailjet'].includes(providerType) 
+        ? schema.required('La clé API est requise') 
+        : schema;
     }),
-    region: Yup.string().when('providerType', {
-      is: (val: string) => val === 'aws_ses',
-      then: () => Yup.string().required('La région est requise')
-    })
+    region: Yup.string().when('providerType', (providerType: any, schema: any) => {
+      return providerType === 'aws_ses' ? schema.required('La région AWS est requise') : schema;
+    }),
+    sendingRatePerSecond: Yup.number().min(0, 'Le taux d\'envoi ne peut pas être négatif'),
+    sendingRatePerMinute: Yup.number().min(0, 'Le taux d\'envoi ne peut pas être négatif'),
+    sendingRatePerHour: Yup.number().min(0, 'Le taux d\'envoi ne peut pas être négatif'),
+    sendingRatePerDay: Yup.number().min(0, 'Le taux d\'envoi ne peut pas être négatif'),
+    dailyQuota: Yup.number().min(0, 'Le quota ne peut pas être négatif'),
+    priority: Yup.number().min(0, 'La priorité ne peut pas être négative')
   });
   
-  // État initial pour le formulaire d'expéditeur
-  const emptySender: SmtpSender = {
-    email: '',
-    name: '',
-    isActive: true
-  };
-
-  // Gestion des expéditeurs
-  const [senderFormData, setSenderFormData] = useState<SmtpSender>(emptySender);
-  
-  // Schéma de validation pour les expéditeurs
-  const senderValidationSchema = Yup.object().shape({
-    email: Yup.string().email('Email invalide').required('L\'email est requis'),
-    name: Yup.string().required('Le nom est requis')
-  });
-
   // Gestion du formulaire avec Formik
   const formik = useFormik({
     initialValues: initialValues ? {
       ...initialValues,
       port: initialValues.port?.toString() || defaultValues.port,
-      senders: initialValues.senders || [],
-      senderRotationEnabled: initialValues.senderRotationEnabled || false,
-      senderRotationType: initialValues.senderRotationType || 'sequential'
+      sendingRatePerSecond: initialValues.sendingRatePerSecond || defaultValues.sendingRatePerSecond,
+      sendingRatePerMinute: initialValues.sendingRatePerMinute || defaultValues.sendingRatePerMinute,
+      sendingRatePerHour: initialValues.sendingRatePerHour || defaultValues.sendingRatePerHour,
+      sendingRatePerDay: initialValues.sendingRatePerDay || defaultValues.sendingRatePerDay,
+      dailyQuota: initialValues.dailyQuota || defaultValues.dailyQuota,
+      priority: initialValues.priority || defaultValues.priority
     } : defaultValues,
     validationSchema,
     onSubmit: async (values) => {
@@ -207,9 +201,16 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
           updatedAt: new Date().toISOString(),
           providerType: values.providerType as 'aws_ses' | 'custom_smtp' | 'office365' | 'sendgrid' | 'mailjet',
           port: port ? parseInt(port as string) : undefined,
-          senders: values.senders || [],
-          senderRotationEnabled: values.senderRotationEnabled || false,
-          senderRotationType: values.senderRotationType || 'sequential'
+          sendingRatePerSecond: values.sendingRatePerSecond || 0,
+          sendingRatePerMinute: values.sendingRatePerMinute || 0,
+          sendingRatePerHour: values.sendingRatePerHour || 0,
+          sendingRatePerDay: values.sendingRatePerDay || 0,
+          dailyQuota: values.dailyQuota || 0,
+          priority: values.priority || 1,
+          isActive: values.isActive || true,
+          requiresTls: values.requiresTls || false,
+          isDefault: values.isDefault || false,
+          region: values.region as 'us-east-1' | 'us-east-2' | 'us-west-1' | 'us-west-2' | 'ca-central-1' | 'eu-west-1' | 'eu-west-2' | 'eu-west-3' | 'eu-central-1' | 'eu-north-1' | 'eu-south-1' | 'ap-east-1' | 'ap-south-1' | 'ap-northeast-1' | 'ap-northeast-2' | 'ap-northeast-3' | 'ap-southeast-1' | 'ap-southeast-2' | 'sa-east-1' | 'me-south-1' | 'af-south-1'
         };
         
         if (isEditing) {
@@ -258,59 +259,6 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
 
   const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
-  };
-  
-  // Gestionnaires pour les dialogues d'expéditeur
-  const handleAddSender = () => {
-    setSenderFormData(emptySender);
-    setIsEditingSender(false);
-    setOpenSenderDialog(true);
-  };
-  
-  const handleEditSender = (sender: SmtpSender, index: number) => {
-    setSenderFormData(sender);
-    setCurrentSender(sender);
-    setIsEditingSender(true);
-    setOpenSenderDialog(true);
-  };
-  
-  const handleDeleteSender = (index: number) => {
-    const newSenders = [...formik.values.senders || []];
-    newSenders.splice(index, 1);
-    formik.setFieldValue('senders', newSenders);
-  };
-  
-  const handleCloseSenderDialog = () => {
-    setOpenSenderDialog(false);
-    setSenderFormData(emptySender);
-    setCurrentSender(null);
-  };
-  
-  const handleSaveSender = () => {
-    try {
-      // Validation
-      senderValidationSchema.validateSync(senderFormData);
-      
-      // Update senders array
-      let newSenders = [...formik.values.senders || []];
-      
-      if (isEditingSender && currentSender) {
-        // Edit existing sender
-        const index = newSenders.findIndex(s => 
-          s.email === currentSender.email && s.name === currentSender.name);
-        if (index !== -1) {
-          newSenders[index] = senderFormData;
-        }
-      } else {
-        // Add new sender
-        newSenders.push(senderFormData);
-      }
-      
-      formik.setFieldValue('senders', newSenders);
-      handleCloseSenderDialog();
-    } catch (err: any) {
-      toast.error(err.message || 'Données d\'expéditeur invalides');
-    }
   };
   
   // Met à jour le nom d'hôte AWS SES en fonction de la région sélectionnée
@@ -584,125 +532,111 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
                   />
                 </Grid>
                 
-                {/* Section pour les expéditeurs */}
-                <Grid item xs={12}>
-                  <Divider sx={{ my: 2 }} />
-                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                    <Typography variant="subtitle2" className="font-medium text-gray-700">
-                      Expéditeurs
-                    </Typography>
-                    <Button
+                <Typography variant="h6" sx={{ mt: 4, mb: 2 }}>
+                  Paramètres de quotas et limites d'envoi
+                </Typography>
+
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      id="sendingRatePerSecond"
+                      name="sendingRatePerSecond"
+                      label="Taux d'envoi par seconde"
+                      type="number"
                       variant="outlined"
-                      size="small"
-                      startIcon={<AddIcon />}
-                      onClick={handleAddSender}
-                    >
-                      Ajouter un expéditeur
-                    </Button>
-                  </Box>
-                  
-                  {(!formik.values.senders || formik.values.senders.length === 0) ? (
-                    <Alert severity="info" sx={{ mb: 2 }}>
-                      Aucun expéditeur configuré. Ajoutez des expéditeurs pour pouvoir envoyer des emails.
-                    </Alert>
-                  ) : (
-                    <List sx={{ mb: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
-                      {formik.values.senders.map((sender, index) => (
-                        <ListItem
-                          key={index}
-                          divider={index < (formik.values.senders?.length || 0) - 1}
-                          secondaryAction={
-                            <Box>
-                              <IconButton 
-                                edge="end" 
-                                aria-label="edit" 
-                                onClick={() => handleEditSender(sender, index)}
-                                size="small"
-                              >
-                                <EditIcon />
-                              </IconButton>
-                              <IconButton 
-                                edge="end" 
-                                aria-label="delete" 
-                                onClick={() => handleDeleteSender(index)}
-                                size="small"
-                                color="error"
-                              >
-                                <DeleteIcon />
-                              </IconButton>
-                            </Box>
-                          }
-                        >
-                          <ListItemText
-                            primary={
-                              <Box display="flex" alignItems="center">
-                                <Typography variant="body1">{sender.name} &lt;{sender.email}&gt;</Typography>
-                                {sender.isActive ? (
-                                  <Chip 
-                                    label="Actif" 
-                                    size="small" 
-                                    color="success" 
-                                    sx={{ ml: 1 }}
-                                  />
-                                ) : (
-                                  <Chip 
-                                    label="Inactif" 
-                                    size="small" 
-                                    color="default" 
-                                    sx={{ ml: 1 }}
-                                  />
-                                )}
-                              </Box>
-                            }
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  )}
-                </Grid>
-                
-                {/* Options de rotation des expéditeurs */}
-                {formik.values.senders && formik.values.senders.length > 1 && (
-                  <Grid item xs={12}>
-                    <Card variant="outlined" sx={{ p: 2, mb: 2 }}>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={formik.values.senderRotationEnabled}
-                            onChange={formik.handleChange}
-                            name="senderRotationEnabled"
-                            color="primary"
-                          />
-                        }
-                        label="Activer la rotation des expéditeurs"
-                      />
-                      
-                      {formik.values.senderRotationEnabled && (
-                        <Box sx={{ mt: 2, pl: 3 }}>
-                          <Typography variant="body2" className="mb-2 text-gray-700">
-                            Type de rotation :
-                          </Typography>
-                          <RadioGroup
-                            value={formik.values.senderRotationType}
-                            onChange={formik.handleChange}
-                            name="senderRotationType"
-                          >
-                            <FormControlLabel 
-                              value="sequential" 
-                              control={<Radio />} 
-                              label="Séquentielle (un après l'autre)" 
-                            />
-                            <FormControlLabel 
-                              value="random" 
-                              control={<Radio />} 
-                              label="Aléatoire (choix aléatoire)" 
-                            />
-                          </RadioGroup>
-                        </Box>
-                      )}
-                    </Card>
+                      value={formik.values.sendingRatePerSecond || ''}
+                      onChange={formik.handleChange}
+                      InputProps={{ inputProps: { min: 0 } }}
+                      helperText="Limite le nombre d'emails envoyés par seconde"
+                    />
                   </Grid>
-                )}
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      id="sendingRatePerMinute"
+                      name="sendingRatePerMinute"
+                      label="Taux d'envoi par minute"
+                      type="number"
+                      variant="outlined"
+                      value={formik.values.sendingRatePerMinute || ''}
+                      onChange={formik.handleChange}
+                      InputProps={{ inputProps: { min: 0 } }}
+                      helperText="Limite le nombre d'emails envoyés par minute"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      id="sendingRatePerHour"
+                      name="sendingRatePerHour"
+                      label="Taux d'envoi par heure"
+                      type="number"
+                      variant="outlined"
+                      value={formik.values.sendingRatePerHour || ''}
+                      onChange={formik.handleChange}
+                      InputProps={{ inputProps: { min: 0 } }}
+                      helperText="Limite le nombre d'emails envoyés par heure"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      id="sendingRatePerDay"
+                      name="sendingRatePerDay"
+                      label="Taux d'envoi par jour"
+                      type="number"
+                      variant="outlined"
+                      value={formik.values.sendingRatePerDay || ''}
+                      onChange={formik.handleChange}
+                      InputProps={{ inputProps: { min: 0 } }}
+                      helperText="Limite le nombre d'emails envoyés par jour"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      id="dailyQuota"
+                      name="dailyQuota"
+                      label="Quota journalier"
+                      type="number"
+                      variant="outlined"
+                      value={formik.values.dailyQuota || ''}
+                      onChange={formik.handleChange}
+                      InputProps={{ inputProps: { min: 0 } }}
+                      helperText="Nombre maximum d'emails pouvant être envoyés par jour"
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      id="priority"
+                      name="priority"
+                      label="Priorité"
+                      type="number"
+                      variant="outlined"
+                      value={formik.values.priority || ''}
+                      onChange={formik.handleChange}
+                      InputProps={{ inputProps: { min: 0 } }}
+                      helperText="Priorité du fournisseur (plus petit = plus prioritaire)"
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={Boolean(formik.values.isActive)}
+                          onChange={formik.handleChange}
+                          name="isActive"
+                        />
+                      }
+                      label="Fournisseur actif"
+                    />
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                      Désactivez ce paramètre pour suspendre temporairement ce fournisseur sans le supprimer
+                    </Typography>
+                  </Grid>
+                </Grid>
                 
                 <Grid item xs={12}>
                   <Divider sx={{ my: 2 }} />
@@ -731,56 +665,6 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
           </form>
         </CardContent>
       </Card>
-      
-      {/* Dialogue pour ajouter/modifier un expéditeur */}
-      <Dialog open={openSenderDialog} onClose={handleCloseSenderDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {isEditingSender ? "Modifier l'expéditeur" : "Ajouter un expéditeur"}
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            id="name"
-            label="Nom d'expéditeur"
-            fullWidth
-            variant="outlined"
-            value={senderFormData.name}
-            onChange={(e) => setSenderFormData({...senderFormData, name: e.target.value})}
-            required
-            sx={{ mb: 2, mt: 1 }}
-          />
-          <TextField
-            margin="dense"
-            id="email"
-            label="Email d'expéditeur"
-            type="email"
-            fullWidth
-            variant="outlined"
-            value={senderFormData.email}
-            onChange={(e) => setSenderFormData({...senderFormData, email: e.target.value})}
-            required
-            sx={{ mb: 2 }}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={senderFormData.isActive}
-                onChange={(e) => setSenderFormData({...senderFormData, isActive: e.target.checked})}
-                name="isActive"
-                color="primary"
-              />
-            }
-            label="Actif"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseSenderDialog}>Annuler</Button>
-          <Button onClick={handleSaveSender} variant="contained" color="primary">
-            {isEditingSender ? "Mettre à jour" : "Ajouter"}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Layout>
   );
 };

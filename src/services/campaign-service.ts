@@ -119,14 +119,14 @@ export class CampaignService {
   static async sendCampaign(campaignId: string): Promise<boolean> {
     try {
       // Récupérer la campagne
-      const campaign = await this.getCampaign(campaignId);
+      const campaign = await getEmailCampaignById(campaignId);
       if (!campaign) {
         console.error(`Campagne ${campaignId} non trouvée`);
         return false;
       }
 
       // Vérifier que la campagne n'a pas déjà été envoyée
-      if (campaign.status === 'completed') {
+      if (campaign.status === 'sent') {
         console.error(`La campagne ${campaignId} a déjà été envoyée`);
         await this.updateCampaignStatus(campaignId, 'failed', 'La campagne a déjà été envoyée');
         return false;
@@ -157,7 +157,7 @@ export class CampaignService {
         return false;
       }
 
-      // Récupérer les fournisseurs SMTP (supporte désormais plusieurs fournisseurs)
+      // Récupérer les fournisseurs SMTP (supporte plusieurs fournisseurs)
       let smtpProviders: SmtpProvider[] = [];
       
       // Si providerId est un tableau, récupérer tous les fournisseurs
@@ -166,7 +166,12 @@ export class CampaignService {
           try {
             const provider = await SmtpProviderService.getSmtpProvider(id);
             if (provider) {
-              smtpProviders.push(provider);
+              // Vérifier si le provider est actif et n'a pas dépassé son quota
+              if (provider.isActive !== false && this.isProviderUnderQuota(provider)) {
+                smtpProviders.push(provider);
+              } else {
+                console.warn(`Le fournisseur SMTP ${id} est inactif ou a dépassé son quota et ne sera pas utilisé`);
+              }
             }
           } catch (error) {
             console.error(`Erreur lors de la récupération du fournisseur SMTP ${id}:`, error);
@@ -177,7 +182,11 @@ export class CampaignService {
         try {
           const provider = await SmtpProviderService.getSmtpProvider(campaign.smtpProviderId);
           if (provider) {
-            smtpProviders.push(provider);
+            if (provider.isActive !== false && this.isProviderUnderQuota(provider)) {
+              smtpProviders.push(provider);
+            } else {
+              console.warn(`Le fournisseur SMTP ${campaign.smtpProviderId} est inactif ou a dépassé son quota et ne sera pas utilisé`);
+            }
           }
         } catch (error) {
           console.error(`Erreur lors de la récupération du fournisseur SMTP ${campaign.smtpProviderId}:`, error);
@@ -186,10 +195,15 @@ export class CampaignService {
 
       if (smtpProviders.length === 0) {
         console.error(`Aucun fournisseur SMTP valide trouvé pour la campagne ${campaignId}`);
-        await this.updateCampaignStatus(campaignId, 'failed', 'Aucun fournisseur SMTP valide trouvé');
+        await this.updateCampaignStatus(campaignId, 'failed', 'Aucun fournisseur SMTP valide trouvé ou tous les fournisseurs ont atteint leur quota');
         return false;
       }
 
+      // Préparer les listes de sujets, noms d'expéditeur et emails d'expéditeur
+      const subjects = Array.isArray(campaign.subject) ? campaign.subject : [String(campaign.subject || '')];
+      const fromNames = Array.isArray(campaign.fromName) ? campaign.fromName : [String(campaign.fromName || '')];
+      const fromEmails = Array.isArray(campaign.fromEmail) ? campaign.fromEmail : [String(campaign.fromEmail || '')];
+      
       // Créer les services SMTP pour chaque fournisseur
       const smtpServices = smtpProviders.map(provider => createSmtpService(provider));
 
@@ -204,49 +218,149 @@ export class CampaignService {
       const recipients = campaign.recipients || [];
       const totalRecipients = recipients.length;
 
+      // Déterminer la vitesse d'envoi
+      const sendingRate = this.calculateSendingRate(campaign, smtpProviders);
+      
+      // Fonction d'indexation pour la rotation avec différentes stratégies
+      const getNextIndex = (
+        currentIndex: number, 
+        totalItems: number, 
+        rotationType: 'sequential' | 'random' | 'balanced' | 'roundRobin' | 'abTesting' = 'sequential'
+      ): number => {
+        switch (rotationType) {
+          case 'random':
+            return Math.floor(Math.random() * totalItems);
+          case 'balanced':
+            // Distribue en fonction de la priorité ou de la charge
+            const availableProviders = smtpProviders
+              .map((provider, idx) => ({ idx, provider }))
+              .filter(p => this.isProviderUnderQuota(p.provider));
+            
+            if (availableProviders.length === 0) return currentIndex % totalItems;
+            
+            // Trier par priorité (si définie) ou par envois restants
+            availableProviders.sort((a, b) => {
+              if (a.provider.priority !== undefined && b.provider.priority !== undefined) {
+                return a.provider.priority - b.provider.priority;
+              }
+              const aRemaining = this.getRemainingQuota(a.provider);
+              const bRemaining = this.getRemainingQuota(b.provider);
+              return bRemaining - aRemaining; // Plus de quota restant = priorité plus élevée
+            });
+            
+            return availableProviders[0].idx;
+          case 'roundRobin':
+            return (currentIndex + 1) % totalItems;
+          case 'abTesting':
+            // Pour les tests A/B, nous utilisons des groupes fixes
+            if (!campaign.abTestingOptions || !campaign.abTestingOptions.enabled) {
+              return Math.floor(Math.random() * totalItems);
+            }
+            // Pendant la phase de test, utiliser l'index basé sur le recipient
+            const testPercentage = campaign.abTestingOptions.testSize / 100;
+            const recipientIndex = successCount + failureCount;
+            const normalizedIndex = recipientIndex % (totalItems * 100);
+            if (normalizedIndex / 100 < testPercentage * totalItems) {
+              return Math.floor(normalizedIndex / (100 * testPercentage));
+            }
+            // Si nous avons un gagnant, l'utiliser
+            if (campaign.abTestingOptions.winner !== undefined) {
+              const winnerIndex = totalItems.toString().indexOf(campaign.abTestingOptions.winner);
+              return winnerIndex >= 0 ? winnerIndex : 0;
+            }
+            return 0;
+          case 'sequential':
+          default:
+            return (currentIndex + 1) % totalItems;
+        }
+      };
+      
+      // Compteurs pour la rotation
+      let templateIndex = 0;
+      let smtpIndex = 0;
+      let subjectIndex = 0;
+      let fromNameIndex = 0;
+      let fromEmailIndex = 0;
+      
+      // Options de rotation
+      const templateRotation = campaign.rotationOptions?.templateRotation || 'sequential';
+      const smtpRotation = campaign.rotationOptions?.smtpRotation || 'balanced';
+      const subjectRotation = campaign.rotationOptions?.subjectRotation || 'sequential';
+      const senderRotation = campaign.rotationOptions?.senderRotation || 'sequential';
+
       // Traitement par lots pour éviter de surcharger le serveur SMTP
-      const batchSize = 50;
+      const batchSize = Math.min(50, sendingRate.perBatch);
       for (let i = 0; i < recipients.length; i += batchSize) {
         const batch = recipients.slice(i, i + batchSize);
+        const startTime = Date.now();
         
         // Traitement parallèle des destinataires dans le lot actuel
-        const sendPromises = batch.map(async (recipient: Recipient) => {
+        const sendPromises = batch.map(async (recipient: string) => {
           try {
-            // Sélectionner un template aléatoire si plusieurs sont disponibles
-            const template = templates.length > 1 
-              ? templates[Math.floor(Math.random() * templates.length)]
-              : templates[0];
+            // Sélectionner un template selon la stratégie de rotation
+            templateIndex = getNextIndex(templateIndex, templates.length, templateRotation);
+            const template = templates[templateIndex];
             
-            // Sélectionner un service SMTP aléatoire
-            const smtpService = smtpServices.length > 1
-              ? smtpServices[Math.floor(Math.random() * smtpServices.length)]
-              : smtpServices[0];
+            // Sélectionner un service SMTP selon la stratégie de rotation
+            smtpIndex = getNextIndex(smtpIndex, smtpServices.length, smtpRotation);
+            const smtpService = smtpServices[smtpIndex];
+            const smtpProvider = smtpProviders[smtpIndex];
+            
+            // Sélectionner un sujet selon la stratégie de rotation
+            subjectIndex = getNextIndex(subjectIndex, subjects.length, subjectRotation);
+            const subject = subjects[subjectIndex];
+            
+            // Sélectionner un nom et email d'expéditeur selon la stratégie de rotation
+            fromNameIndex = getNextIndex(fromNameIndex, fromNames.length, senderRotation);
+            fromEmailIndex = getNextIndex(fromEmailIndex, fromEmails.length, senderRotation);
+            const fromName = fromNames[fromNameIndex];
+            const fromEmail = fromEmails[fromEmailIndex];
+            
+            // Extraire le prénom et le nom du destinataire si au format "Prénom Nom <email@example.com>"
+            let firstName = '';
+            let lastName = '';
+            let email = recipient;
+            
+            const nameMatch = recipient.match(/(.*?)\s*<(.+?)>/);
+            if (nameMatch) {
+              const fullName = nameMatch[1].trim();
+              email = nameMatch[2].trim();
+              
+              // Diviser le nom complet en prénom et nom
+              const nameParts = fullName.split(' ');
+              if (nameParts.length > 0) {
+                firstName = nameParts[0];
+                if (nameParts.length > 1) {
+                  lastName = nameParts.slice(1).join(' ');
+                }
+              }
+            }
             
             // Personnalisation du contenu HTML
             const personalizedHtml = this.personalizeContent(template.htmlContent, {
-              firstName: recipient.firstName || '',
-              lastName: recipient.lastName || '',
-              email: recipient.email,
-              ...recipient.variables
+              firstName: firstName,
+              lastName: lastName,
+              email: email,
+              // Autres variables potentielles
             });
             
             // Personnalisation du sujet
-            const personalizedSubject = this.personalizeContent(template.subject, {
-              firstName: recipient.firstName || '',
-              lastName: recipient.lastName || '',
-              email: recipient.email,
-              ...recipient.variables
+            const personalizedSubject = this.personalizeContent(subject, {
+              firstName: firstName,
+              lastName: lastName,
+              email: email,
+              // Autres variables potentielles
             });
 
             // Générer un messageId unique
-            const messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+            const messageId = `msg-${campaignId}-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
             
             // Initialiser le tracking pour cet email
             const trackingItem = await TrackingService.initializeTracking(
               campaignId, 
-              recipient.email, 
+              email, 
               messageId,
-              typeof template.templateId === 'string' ? template.templateId : template.templateId[0]
+              template.templateId
             );
 
             // Préparer le HTML avec les éléments de tracking si le tracking est disponible
@@ -255,7 +369,7 @@ export class CampaignService {
               htmlWithTracking = TrackingService.prepareHtmlWithTracking(
                 personalizedHtml,
                 campaignId,
-                recipient.email,
+                email,
                 trackingItem.messageId,
                 trackingItem
               );
@@ -263,19 +377,28 @@ export class CampaignService {
 
             // Envoi de l'email
             const result = await smtpService.sendEmail({
-              to: recipient.email,
+              to: email,
               from: {
-                email: campaign.fromEmail || 'noreply@example.com',
-                name: campaign.fromName || 'North Eyes'
+                email: fromEmail,
+                name: fromName
               },
               subject: personalizedSubject,
               html: htmlWithTracking,
               text: this.htmlToText(personalizedHtml),
-              replyTo: campaign.fromEmail,
-              variables: recipient.variables
+              replyTo: fromEmail,
+              variables: {
+                firstName,
+                lastName,
+                email
+              }
             });
 
-            // Mise à jour des statistiques
+            // Mise à jour des statistiques du fournisseur SMTP
+            if (result.success) {
+              await this.incrementProviderSentCount(smtpProvider.providerId);
+            }
+            
+            // Mise à jour des statistiques de la campagne
             if (result.success) {
               successCount++;
               
@@ -313,7 +436,7 @@ export class CampaignService {
 
             return result;
           } catch (error: any) {
-            console.error(`Erreur lors de l'envoi à ${recipient.email}:`, error);
+            console.error(`Erreur lors de l'envoi à ${recipient}:`, error);
             failureCount++;
             return { success: false, error: error.message };
           }
@@ -322,9 +445,15 @@ export class CampaignService {
         // Attendre que tous les emails du lot soient traités
         await Promise.all(sendPromises);
         
-        // Petite pause entre les lots pour éviter les limitations des fournisseurs SMTP
-        if (i + batchSize < recipients.length) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+        // Calculer le temps nécessaire pour respecter la limite de vitesse
+        const endTime = Date.now();
+        const processingTime = endTime - startTime;
+        const requiredTimeForBatch = (1000 * batch.length) / sendingRate.perSecond;
+        const waitTime = Math.max(0, requiredTimeForBatch - processingTime);
+        
+        // Attendre si nécessaire pour respecter les limites de vitesse
+        if (waitTime > 0 && i + batchSize < recipients.length) {
+          await new Promise(resolve => setTimeout(resolve, waitTime));
         }
       }
 
@@ -845,5 +974,149 @@ export class CampaignService {
       console.error(`Erreur lors de la nouvelle tentative pour la campagne ${campaignId}:`, error);
       return { success: false, error: error.message };
     }
+  }
+
+  // Vérifie si un fournisseur SMTP est sous son quota quotidien
+  private static isProviderUnderQuota(provider: SmtpProvider): boolean {
+    if (!provider.dailyQuota) return true;
+    
+    // Si aucun envoi aujourd'hui ou pas d'info sur les envois, considérer comme sous le quota
+    if (!provider.totalSentToday) return true;
+    
+    // Vérifier si le quota a été réinitialisé aujourd'hui
+    const today = new Date().toISOString().split('T')[0];
+    const lastReset = provider.lastQuotaReset ? provider.lastQuotaReset.split('T')[0] : null;
+    
+    // Si la dernière réinitialisation n'est pas aujourd'hui, considérer comme sous le quota
+    if (lastReset !== today) return true;
+    
+    // Sinon, vérifier le quota
+    return provider.totalSentToday < provider.dailyQuota;
+  }
+  
+  // Récupère le quota restant pour un fournisseur SMTP
+  private static getRemainingQuota(provider: SmtpProvider): number {
+    if (!provider.dailyQuota) return Number.MAX_SAFE_INTEGER;
+    if (!provider.totalSentToday) return provider.dailyQuota;
+    
+    // Vérifier si le quota a été réinitialisé aujourd'hui
+    const today = new Date().toISOString().split('T')[0];
+    const lastReset = provider.lastQuotaReset ? provider.lastQuotaReset.split('T')[0] : null;
+    
+    // Si la dernière réinitialisation n'est pas aujourd'hui, retourner le quota complet
+    if (lastReset !== today) return provider.dailyQuota;
+    
+    // Sinon, calculer le quota restant
+    return Math.max(0, provider.dailyQuota - provider.totalSentToday);
+  }
+  
+  // Incrémente le compteur d'emails envoyés pour un fournisseur SMTP
+  private static async incrementProviderSentCount(providerId: string): Promise<boolean> {
+    try {
+      const provider = await SmtpProviderService.getSmtpProvider(providerId);
+      if (!provider) return false;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const lastReset = provider.lastQuotaReset ? provider.lastQuotaReset.split('T')[0] : null;
+      
+      // Si la dernière réinitialisation n'est pas aujourd'hui, réinitialiser le compteur
+      const totalSentToday = lastReset === today ? (provider.totalSentToday || 0) + 1 : 1;
+      
+      // Mettre à jour le fournisseur
+      const updateParams = {
+        TableName: 'SmtpProviders',
+        Key: { providerId },
+        UpdateExpression: 'SET totalSentToday = :totalSent, lastQuotaReset = :lastReset, updatedAt = :updatedAt',
+        ExpressionAttributeValues: {
+          ':totalSent': totalSentToday,
+          ':lastReset': new Date().toISOString(),
+          ':updatedAt': new Date().toISOString()
+        },
+        ReturnValues: 'UPDATED_NEW'
+      };
+      
+      await dynamoDB.update(updateParams).promise();
+      return true;
+    } catch (error) {
+      console.error(`Erreur lors de l'incrémentation du compteur d'emails envoyés pour le fournisseur ${providerId}:`, error);
+      return false;
+    }
+  }
+  
+  // Calcule la vitesse d'envoi en fonction des paramètres de la campagne et des fournisseurs SMTP
+  private static calculateSendingRate(campaign: EmailCampaign, providers: SmtpProvider[]): { perSecond: number; perBatch: number } {
+    // Valeurs par défaut
+    const defaultRate = {
+      perSecond: 10,
+      perBatch: 50
+    };
+    
+    // Si aucune option d'envoi n'est définie, utiliser les valeurs par défaut
+    if (!campaign.sendingOptions) return defaultRate;
+    
+    // Récupérer les taux configurés dans la campagne
+    const campaignRatePerSecond = campaign.sendingOptions.ratePerSecond;
+    const campaignRatePerMinute = campaign.sendingOptions.ratePerMinute;
+    const campaignRatePerHour = campaign.sendingOptions.ratePerHour;
+    const campaignRatePerDay = campaign.sendingOptions.ratePerDay;
+    
+    // Calculer le taux par seconde à partir des différentes configurations
+    let ratePerSecond = campaignRatePerSecond || defaultRate.perSecond;
+    
+    if (campaignRatePerMinute) {
+      ratePerSecond = Math.min(ratePerSecond, campaignRatePerMinute / 60);
+    }
+    
+    if (campaignRatePerHour) {
+      ratePerSecond = Math.min(ratePerSecond, campaignRatePerHour / 3600);
+    }
+    
+    if (campaignRatePerDay) {
+      ratePerSecond = Math.min(ratePerSecond, campaignRatePerDay / 86400);
+    }
+    
+    // Si l'option respectProviderLimits est activée, prendre en compte les limites des fournisseurs
+    if (campaign.sendingOptions.respectProviderLimits) {
+      // Calculer le taux par seconde agrégé de tous les fournisseurs
+      let providersRatePerSecond = 0;
+      
+      for (const provider of providers) {
+        let providerRate = Number.MAX_SAFE_INTEGER;
+        
+        if (provider.sendingRatePerSecond) {
+          providerRate = Math.min(providerRate, provider.sendingRatePerSecond);
+        }
+        
+        if (provider.sendingRatePerMinute) {
+          providerRate = Math.min(providerRate, provider.sendingRatePerMinute / 60);
+        }
+        
+        if (provider.sendingRatePerHour) {
+          providerRate = Math.min(providerRate, provider.sendingRatePerHour / 3600);
+        }
+        
+        if (provider.sendingRatePerDay) {
+          providerRate = Math.min(providerRate, provider.sendingRatePerDay / 86400);
+        }
+        
+        // Si le fournisseur n'a pas de limite définie, utiliser une valeur par défaut
+        if (providerRate === Number.MAX_SAFE_INTEGER) {
+          providerRate = defaultRate.perSecond;
+        }
+        
+        providersRatePerSecond += providerRate;
+      }
+      
+      // Utiliser le minimum entre le taux de la campagne et le taux agrégé des fournisseurs
+      ratePerSecond = Math.min(ratePerSecond, providersRatePerSecond);
+    }
+    
+    // Calculer la taille du lot en fonction du taux par seconde
+    const perBatch = Math.max(1, Math.min(Math.ceil(ratePerSecond * 5), 100));
+    
+    return {
+      perSecond: ratePerSecond,
+      perBatch
+    };
   }
 }

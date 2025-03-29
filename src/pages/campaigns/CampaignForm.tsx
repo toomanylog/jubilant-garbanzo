@@ -23,7 +23,8 @@ import {
   Tooltip,
   ListItemText,
   Checkbox,
-  OutlinedInput
+  OutlinedInput,
+  Autocomplete
 } from '@mui/material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -59,6 +60,23 @@ interface CampaignFormProps {
   isEditing?: boolean;
 }
 
+interface EmailCampaignFormValues {
+  name: string;
+  subject: string | string[];
+  templateId: string | string[];
+  smtpProviderId: string | string[];
+  fromName: string | string[];
+  fromEmail: string | string[];
+  recipients: string;
+  content: string;
+  rotationOptions: {
+    templateRotation: 'sequential' | 'random';
+    smtpRotation: 'sequential' | 'random' | 'balanced';
+    subjectRotation: 'sequential' | 'random' | 'abTesting';
+    senderRotation: 'sequential' | 'random' | 'roundRobin';
+  };
+}
+
 const CampaignForm: React.FC<CampaignFormProps> = ({ 
   initialValues,
   isEditing = false 
@@ -77,15 +95,21 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   const [isScheduled, setIsScheduled] = useState(false);
 
   // Formulaire initial
-  const initialValuesForm = {
+  const initialValuesForm: EmailCampaignFormValues = {
     name: '',
     subject: '',
     templateId: '',
     smtpProviderId: '',
     fromName: '',
     fromEmail: '',
-    recipients: '' as string,
-    content: ''
+    recipients: '',
+    content: '',
+    rotationOptions: {
+      templateRotation: 'sequential',
+      smtpRotation: 'sequential',
+      subjectRotation: 'sequential',
+      senderRotation: 'sequential'
+    }
   };
 
   // Schéma de validation Yup
@@ -150,7 +174,13 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
               fromName: campaign.fromName || '',
               fromEmail: campaign.fromEmail || '',
               recipients: campaign.recipients ? campaign.recipients.join('\n') : '',
-              content: ''
+              content: '',
+              rotationOptions: campaign.rotationOptions || {
+                templateRotation: 'sequential',
+                smtpRotation: 'sequential',
+                subjectRotation: 'sequential',
+                senderRotation: 'sequential'
+              }
             });
           } else {
             setError('Campagne non trouvée');
@@ -238,7 +268,8 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
             clickRate: 0,
             openRate: 0,
             deliveryRate: 0
-          }
+          },
+          rotationOptions: values.rotationOptions
         };
         
         console.log('Données de la campagne à enregistrer:', campaignData);
@@ -364,73 +395,91 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
                   required
                 />
                 
-                <FormControl 
-                  fullWidth 
-                  margin="normal" 
-                  variant="outlined"
-                  error={formik.touched.templateId && Boolean(formik.errors.templateId)}
-                  className="mb-4"
-                >
-                  <InputLabel id="template-label" required>Modèle d'email</InputLabel>
-                  <Select
-                    labelId="template-label"
-                    id="templateId"
-                    name="templateId"
-                    value={formik.values.templateId}
-                    onChange={(e) => handleSelectTemplateChange(e as any)}
-                    onBlur={formik.handleBlur}
-                    label="Modèle d'email"
-                  >
-                    {templates.length === 0 ? (
-                      <MenuItem value="" disabled>
-                        Aucun modèle disponible
-                      </MenuItem>
-                    ) : (
-                      templates.map((template) => (
-                        <MenuItem key={template.templateId} value={template.templateId}>
-                          {template.name}
-                        </MenuItem>
-                      ))
-                    )}
-                  </Select>
-                  {formik.touched.templateId && formik.errors.templateId && (
-                    <FormHelperText>{formik.errors.templateId}</FormHelperText>
+                <Autocomplete
+                  id="templateId"
+                  options={templates}
+                  getOptionLabel={(option) => option.name}
+                  value={templates.filter(template => {
+                    if (Array.isArray(formik.values.templateId)) {
+                      return formik.values.templateId.includes(template.templateId);
+                    } else {
+                      return template.templateId === formik.values.templateId;
+                    }
+                  })}
+                  onChange={(event, newValue) => {
+                    if (newValue) {
+                      if (Array.isArray(newValue)) {
+                        formik.setFieldValue('templateId', newValue.map(item => item.templateId));
+                      } else {
+                        formik.setFieldValue('templateId', newValue.templateId);
+                      }
+                    } else {
+                      formik.setFieldValue('templateId', '');
+                    }
+                  }}
+                  multiple
+                  renderTags={(selected, getTagProps) =>
+                    selected.map((option, index) => (
+                      <Chip
+                        variant="outlined"
+                        label={option.name}
+                        {...getTagProps({ index })}
+                        key={option.templateId}
+                      />
+                    ))
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Modèles d'email"
+                      error={formik.touched.templateId && Boolean(formik.errors.templateId)}
+                      helperText={formik.touched.templateId && formik.errors.templateId}
+                    />
                   )}
-                </FormControl>
+                />
                 
-                <FormControl 
-                  fullWidth 
-                  margin="normal" 
-                  variant="outlined"
-                  error={formik.touched.smtpProviderId && Boolean(formik.errors.smtpProviderId)}
-                  className="mb-4"
-                >
-                  <InputLabel id="provider-label" required>Fournisseur SMTP</InputLabel>
-                  <Select
-                    labelId="provider-label"
-                    id="smtpProviderId"
-                    name="smtpProviderId"
-                    value={formik.values.smtpProviderId}
-                    onChange={formik.handleChange}
-                    onBlur={formik.handleBlur}
-                    label="Fournisseur SMTP"
-                  >
-                    {providers.length === 0 ? (
-                      <MenuItem value="" disabled>
-                        Aucun fournisseur disponible
-                      </MenuItem>
-                    ) : (
-                      providers.map((provider) => (
-                        <MenuItem key={provider.providerId} value={provider.providerId}>
-                          {provider.name} ({provider.providerType})
-                        </MenuItem>
-                      ))
-                    )}
-                  </Select>
-                  {formik.touched.smtpProviderId && formik.errors.smtpProviderId && (
-                    <FormHelperText>{formik.errors.smtpProviderId}</FormHelperText>
+                <Autocomplete
+                  id="smtpProviderId"
+                  options={providers}
+                  getOptionLabel={(option) => option.name}
+                  value={providers.filter(provider => {
+                    if (Array.isArray(formik.values.smtpProviderId)) {
+                      return formik.values.smtpProviderId.includes(provider.providerId);
+                    } else {
+                      return provider.providerId === formik.values.smtpProviderId;
+                    }
+                  })}
+                  onChange={(event, newValue) => {
+                    if (newValue) {
+                      if (Array.isArray(newValue)) {
+                        formik.setFieldValue('smtpProviderId', newValue.map(item => item.providerId));
+                      } else {
+                        formik.setFieldValue('smtpProviderId', newValue.providerId);
+                      }
+                    } else {
+                      formik.setFieldValue('smtpProviderId', '');
+                    }
+                  }}
+                  multiple
+                  renderTags={(selected, getTagProps) =>
+                    selected.map((option, index) => (
+                      <Chip
+                        variant="outlined"
+                        label={option.name}
+                        {...getTagProps({ index })}
+                        key={option.providerId}
+                      />
+                    ))
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Fournisseurs SMTP"
+                      error={formik.touched.smtpProviderId && Boolean(formik.errors.smtpProviderId)}
+                      helperText={formik.touched.smtpProviderId && formik.errors.smtpProviderId}
+                    />
                   )}
-                </FormControl>
+                />
                 
                 <FormControl className="mb-4 mt-6" component="fieldset" variant="standard">
                   <Typography 
@@ -484,53 +533,112 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
                 titleTypographyProps={{ variant: 'subtitle1', className: 'font-semibold' }}
               />
               <CardContent className="p-6">
-                <TextField
-                  fullWidth
+                <Autocomplete
                   id="subject"
-                  name="subject"
-                  label="Objet de l'email"
-                  variant="outlined"
-                  margin="normal"
-                  value={formik.values.subject}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={formik.touched.subject && Boolean(formik.errors.subject)}
-                  helperText={formik.touched.subject && formik.errors.subject}
-                  className="mb-4"
-                  required
+                  options={[]}
+                  value={Array.isArray(formik.values.subject) ? formik.values.subject : [formik.values.subject]}
+                  onChange={(event, newValue) => {
+                    if (newValue) {
+                      if (Array.isArray(newValue)) {
+                        formik.setFieldValue('subject', newValue);
+                      } else {
+                        formik.setFieldValue('subject', newValue);
+                      }
+                    } else {
+                      formik.setFieldValue('subject', '');
+                    }
+                  }}
+                  multiple
+                  renderTags={(selected, getTagProps) =>
+                    selected.map((option, index) => (
+                      <Chip
+                        variant="outlined"
+                        label={option}
+                        {...getTagProps({ index })}
+                        key={option}
+                      />
+                    ))
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Sujets"
+                      error={formik.touched.subject && Boolean(formik.errors.subject)}
+                      helperText={formik.touched.subject && formik.errors.subject}
+                    />
+                  )}
                 />
                 
-                <TextField
-                  fullWidth
+                <Autocomplete
                   id="fromName"
-                  name="fromName"
-                  label="Nom de l'expéditeur"
-                  variant="outlined"
-                  margin="normal"
-                  value={formik.values.fromName}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={formik.touched.fromName && Boolean(formik.errors.fromName)}
-                  helperText={formik.touched.fromName && formik.errors.fromName}
-                  className="mb-4"
-                  required
+                  options={[]}
+                  value={Array.isArray(formik.values.fromName) ? formik.values.fromName : [formik.values.fromName]}
+                  onChange={(event, newValue) => {
+                    if (newValue) {
+                      if (Array.isArray(newValue)) {
+                        formik.setFieldValue('fromName', newValue);
+                      } else {
+                        formik.setFieldValue('fromName', newValue);
+                      }
+                    } else {
+                      formik.setFieldValue('fromName', '');
+                    }
+                  }}
+                  multiple
+                  renderTags={(selected, getTagProps) =>
+                    selected.map((option, index) => (
+                      <Chip
+                        variant="outlined"
+                        label={option}
+                        {...getTagProps({ index })}
+                        key={option}
+                      />
+                    ))
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Noms d'expéditeur"
+                      error={formik.touched.fromName && Boolean(formik.errors.fromName)}
+                      helperText={formik.touched.fromName && formik.errors.fromName}
+                    />
+                  )}
                 />
                 
-                <TextField
-                  fullWidth
+                <Autocomplete
                   id="fromEmail"
-                  name="fromEmail"
-                  label="Email de l'expéditeur"
-                  variant="outlined"
-                  margin="normal"
-                  type="email"
-                  value={formik.values.fromEmail}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={formik.touched.fromEmail && Boolean(formik.errors.fromEmail)}
-                  helperText={formik.touched.fromEmail && formik.errors.fromEmail}
-                  className="mb-4"
-                  required
+                  options={[]}
+                  value={Array.isArray(formik.values.fromEmail) ? formik.values.fromEmail : [formik.values.fromEmail]}
+                  onChange={(event, newValue) => {
+                    if (newValue) {
+                      if (Array.isArray(newValue)) {
+                        formik.setFieldValue('fromEmail', newValue);
+                      } else {
+                        formik.setFieldValue('fromEmail', newValue);
+                      }
+                    } else {
+                      formik.setFieldValue('fromEmail', '');
+                    }
+                  }}
+                  multiple
+                  renderTags={(selected, getTagProps) =>
+                    selected.map((option, index) => (
+                      <Chip
+                        variant="outlined"
+                        label={option}
+                        {...getTagProps({ index })}
+                        key={option}
+                      />
+                    ))
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Emails d'expéditeur"
+                      error={formik.touched.fromEmail && Boolean(formik.errors.fromEmail)}
+                      helperText={formik.touched.fromEmail && formik.errors.fromEmail}
+                    />
+                  )}
                 />
                 
                 <Box className="mt-6 mb-4">
@@ -604,6 +712,149 @@ jane.doe@exemple.com"
           </Button>
         </Box>
       </form>
+
+      <Typography variant="h6" sx={{ mt: 4, mb: 2 }}>
+        Options de rotation
+      </Typography>
+
+      <Grid container spacing={2}>
+        <Grid item xs={12} sm={6}>
+          <FormControl fullWidth>
+            <InputLabel id="template-rotation-label">Rotation des modèles</InputLabel>
+            <Select
+              labelId="template-rotation-label"
+              id="templateRotation"
+              name="rotationOptions.templateRotation"
+              value={formik.values.rotationOptions?.templateRotation || 'sequential'}
+              onChange={formik.handleChange}
+              label="Rotation des modèles"
+            >
+              <MenuItem value="sequential">Séquentielle</MenuItem>
+              <MenuItem value="random">Aléatoire</MenuItem>
+            </Select>
+            <FormHelperText>Définit l'ordre d'utilisation des modèles</FormHelperText>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <FormControl fullWidth>
+            <InputLabel id="smtp-rotation-label">Rotation des fournisseurs SMTP</InputLabel>
+            <Select
+              labelId="smtp-rotation-label"
+              id="smtpRotation"
+              name="rotationOptions.smtpRotation"
+              value={formik.values.rotationOptions?.smtpRotation || 'sequential'}
+              onChange={formik.handleChange}
+              label="Rotation des fournisseurs SMTP"
+            >
+              <MenuItem value="sequential">Séquentielle</MenuItem>
+              <MenuItem value="random">Aléatoire</MenuItem>
+              <MenuItem value="balanced">Équilibrée (selon la priorité)</MenuItem>
+            </Select>
+            <FormHelperText>Définit l'ordre d'utilisation des fournisseurs SMTP</FormHelperText>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <FormControl fullWidth>
+            <InputLabel id="subject-rotation-label">Rotation des sujets</InputLabel>
+            <Select
+              labelId="subject-rotation-label"
+              id="subjectRotation"
+              name="rotationOptions.subjectRotation"
+              value={formik.values.rotationOptions?.subjectRotation || 'sequential'}
+              onChange={formik.handleChange}
+              label="Rotation des sujets"
+            >
+              <MenuItem value="sequential">Séquentielle</MenuItem>
+              <MenuItem value="random">Aléatoire</MenuItem>
+              <MenuItem value="abTesting">Test A/B</MenuItem>
+            </Select>
+            <FormHelperText>Définit l'ordre d'utilisation des sujets</FormHelperText>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <FormControl fullWidth>
+            <InputLabel id="sender-rotation-label">Rotation des expéditeurs</InputLabel>
+            <Select
+              labelId="sender-rotation-label"
+              id="senderRotation"
+              name="rotationOptions.senderRotation"
+              value={formik.values.rotationOptions?.senderRotation || 'sequential'}
+              onChange={formik.handleChange}
+              label="Rotation des expéditeurs"
+            >
+              <MenuItem value="sequential">Séquentielle</MenuItem>
+              <MenuItem value="random">Aléatoire</MenuItem>
+              <MenuItem value="roundRobin">Round Robin</MenuItem>
+            </Select>
+            <FormHelperText>Définit l'ordre d'utilisation des noms et emails d'expéditeurs</FormHelperText>
+          </FormControl>
+        </Grid>
+      </Grid>
+
+      <Typography variant="h6" sx={{ mt: 4, mb: 2 }}>
+        Sujets multiples
+      </Typography>
+
+      <Grid container spacing={2}>
+        <Grid item xs={12}>
+          <TextField
+            fullWidth
+            id="subjects"
+            name="subjects"
+            label="Sujets (un par ligne)"
+            multiline
+            rows={4}
+            variant="outlined"
+            value={Array.isArray(formik.values.subject) ? formik.values.subject.join('\n') : formik.values.subject}
+            onChange={(e) => {
+              const subjects = e.target.value.split('\n').filter(subject => subject.trim().length > 0);
+              formik.setFieldValue('subject', subjects.length > 1 ? subjects : subjects[0] || '');
+            }}
+            helperText="Entrez un sujet par ligne pour utiliser plusieurs sujets"
+          />
+        </Grid>
+      </Grid>
+
+      <Typography variant="h6" sx={{ mt: 4, mb: 2 }}>
+        Expéditeurs
+      </Typography>
+
+      <Grid container spacing={2}>
+        <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
+            id="fromNames"
+            name="fromNames"
+            label="Noms d'expéditeur (un par ligne)"
+            multiline
+            rows={4}
+            variant="outlined"
+            value={Array.isArray(formik.values.fromName) ? formik.values.fromName.join('\n') : formik.values.fromName}
+            onChange={(e) => {
+              const names = e.target.value.split('\n').filter(name => name.trim().length > 0);
+              formik.setFieldValue('fromName', names.length > 1 ? names : names[0] || '');
+            }}
+            helperText="Entrez un nom d'expéditeur par ligne pour utiliser plusieurs noms"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
+            id="fromEmails"
+            name="fromEmails"
+            label="Emails d'expéditeur (un par ligne)"
+            multiline
+            rows={4}
+            variant="outlined"
+            value={Array.isArray(formik.values.fromEmail) ? formik.values.fromEmail.join('\n') : formik.values.fromEmail}
+            onChange={(e) => {
+              const emails = e.target.value.split('\n').filter(email => email.trim().length > 0);
+              formik.setFieldValue('fromEmail', emails.length > 1 ? emails : emails[0] || '');
+            }}
+            helperText="Entrez un email d'expéditeur par ligne pour utiliser plusieurs emails"
+          />
+        </Grid>
+      </Grid>
     </Layout>
   );
 };

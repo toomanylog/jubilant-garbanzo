@@ -21,29 +21,29 @@ export interface SmtpSender {
 export interface SmtpProvider {
   providerId: string;
   userId: string;
-  providerType: 'aws_ses' | 'custom_smtp' | 'office365' | 'sendgrid' | 'mailjet';
   name: string;
+  providerType: 'aws_ses' | 'custom_smtp' | 'office365' | 'sendgrid' | 'mailjet';
   host?: string;
   port?: number;
   username?: string;
   password?: string;
+  secure?: boolean;
   apiKey?: string;
   region?: string;
   isDefault: boolean;
   requiresTls?: boolean;
-  senders?: SmtpSender[];
-  senderRotationEnabled?: boolean;
-  senderRotationType?: 'sequential' | 'random';
-  // Paramètres de taux d'envoi
-  rateLimits?: {
-    perSecond?: number;
-    perMinute?: number;
-    perHour?: number;
-    perDay?: number;
-    maxTotal?: number;
-  };
   createdAt: string;
   updatedAt: string;
+  // Paramètres de quotas et limites d'envoi
+  sendingRatePerSecond?: number;
+  sendingRatePerMinute?: number;
+  sendingRatePerHour?: number;
+  sendingRatePerDay?: number;
+  dailyQuota?: number;
+  totalSentToday?: number;
+  lastQuotaReset?: string; // Date de la dernière réinitialisation du quota
+  isActive?: boolean;      // Indique si le fournisseur est actif ou inactif
+  priority?: number;       // Priorité du fournisseur (plus petit = plus prioritaire)
 }
 
 // Interface pour les templates d'emails
@@ -76,15 +76,27 @@ export interface EmailCampaignStats {
   deliveryRate: number;
 }
 
+// Interface pour les expéditeurs
+export interface Sender {
+  id: string;
+  name: string;
+  email: string;
+  isActive: boolean;
+  bounceCount?: number;
+  complaintsCount?: number;
+  lastUsed?: string; // Date de dernière utilisation
+}
+
+// Interface pour la campagne email avec les options de rotation
 export interface EmailCampaign {
   campaignId: string;
   userId: string;
   name: string;
   templateId: string | string[]; // Peut être un ID unique ou un tableau d'IDs
   smtpProviderId: string | string[]; // Peut être un ID unique ou un tableau d'IDs
-  subject: string;
-  fromName: string;
-  fromEmail: string;
+  subject: string | string[]; // Peut être un sujet unique ou un tableau de sujets
+  fromName: string | string[]; // Peut être un nom unique ou un tableau de noms
+  fromEmail: string | string[]; // Peut être un email unique ou un tableau d'emails
   recipients: string[];
   status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed' | 'paused';
   scheduledAt: string | null;
@@ -92,6 +104,32 @@ export interface EmailCampaign {
   createdAt: string;
   updatedAt: string;
   stats: EmailCampaignStats;
+  // Options de rotation
+  rotationOptions?: {
+    templateRotation: 'sequential' | 'random';
+    smtpRotation: 'sequential' | 'random' | 'balanced';
+    subjectRotation: 'sequential' | 'random' | 'abTesting';
+    senderRotation: 'sequential' | 'random' | 'roundRobin';
+  };
+  // Paramètres d'envoi
+  sendingOptions?: {
+    ratePerSecond?: number;
+    ratePerMinute?: number;
+    ratePerHour?: number;
+    ratePerDay?: number;
+    maxSendAttempts?: number;
+    rescheduleFailedAfterMinutes?: number;
+    enableThrottling?: boolean;
+    respectProviderLimits?: boolean;
+  };
+  // Paramètres de test A/B
+  abTestingOptions?: {
+    enabled: boolean;
+    testSize: number; // Pourcentage des destinataires pour le test
+    winningCriteria: 'opens' | 'clicks';
+    waitTime: number; // Heures d'attente avant d'envoyer au reste
+    winner?: string; // ID du template, sujet ou sender gagnant
+  };
 }
 
 // Interface pour les paramètres utilisateur
