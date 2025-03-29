@@ -55,19 +55,24 @@ export class TemplateService {
     template: EmailTemplate,
     variables: Record<string, string> = {}
   ): { html: string; text: string; subject: string } {
+    // On utilise le contenu HTML et texte du template
+    const htmlContent = template.htmlContent || '';
+    const textContent = template.textContent || '';
+    const subject = template.subject || '';
+    
     // Remplace les variables dans le contenu HTML
-    const html = this.parseTemplate(template.htmlContent, variables);
+    const html = this.parseTemplate(htmlContent, variables);
     
     // Remplace les variables dans le contenu texte s'il existe
-    const text = template.textContent
-      ? this.parseTemplate(template.textContent, variables)
+    const text = textContent
+      ? this.parseTemplate(textContent, variables)
       // Si pas de version texte, génère une version simplifiée à partir du HTML
       : this.htmlToText(html);
       
     // Remplace les variables dans le sujet
-    const subject = this.parseTemplate(template.subject, variables);
+    const parsedSubject = this.parseTemplate(subject, variables);
     
-    return { html, text, subject };
+    return { html, text, subject: parsedSubject };
   }
 
   /**
@@ -97,7 +102,8 @@ export class TemplateService {
     template: EmailTemplate,
     requiredVariables: string[] = []
   ): { isValid: boolean; missingVariables: string[] } {
-    const templateVariables = this.extractVariables(template.htmlContent);
+    const htmlContent = template.htmlContent || '';
+    const templateVariables = this.extractVariables(htmlContent);
     const missingVariables = requiredVariables.filter(
       variable => !templateVariables.includes(variable)
     );
@@ -133,33 +139,5 @@ export class TemplateService {
       console.error(`Erreur lors de la récupération du template ${templateId}:`, error);
       return null;
     }
-  }
-
-  /**
-   * Prépare un template en y injectant les variables
-   * @param template Le template à préparer
-   * @param variables Les variables à injecter
-   * @returns Le contenu du template avec les variables injectées
-   */
-  static prepareTemplate(template: EmailTemplate, variables: Record<string, string>) {
-    let html = template.html;
-    let text = template.text || '';
-    let subject = template.subject;
-    
-    // Remplacer toutes les variables dans le contenu HTML, texte et sujet
-    Object.entries(variables).forEach(([key, value]) => {
-      const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
-      html = html.replace(regex, value);
-      text = text.replace(regex, value);
-      subject = subject.replace(regex, value);
-    });
-    
-    // Supprimer les variables non remplacées
-    const cleanupRegex = /{{(\s*[\w\.]+\s*)}}/g;
-    html = html.replace(cleanupRegex, '');
-    text = text.replace(cleanupRegex, '');
-    subject = subject.replace(cleanupRegex, '');
-    
-    return { html, text, subject };
   }
 } 
