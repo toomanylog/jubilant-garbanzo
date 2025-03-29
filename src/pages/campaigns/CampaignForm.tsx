@@ -115,11 +115,22 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   // Schéma de validation Yup
   const validationSchema = Yup.object({
     name: Yup.string().required('Le nom de la campagne est requis'),
-    subject: Yup.string().required('Le sujet est requis'),
-    templateId: Yup.string().required('Un template est requis'),
-    smtpProviderId: Yup.string().required('Un fournisseur SMTP est requis'),
-    fromName: Yup.string().required('Le nom d\'expéditeur est requis'),
-    fromEmail: Yup.string().email('Email invalide').required('L\'email d\'expéditeur est requis'),
+    subject: Yup.mixed().required('Le sujet est requis'),
+    templateId: Yup.mixed().required('Un template est requis'),
+    smtpProviderId: Yup.mixed().required('Un fournisseur SMTP est requis'),
+    fromName: Yup.mixed().required('Le nom d\'expéditeur est requis'),
+    fromEmail: Yup.mixed().test(
+      'valid-email',
+      'Email invalide',
+      function(value) {
+        if (typeof value === 'string') {
+          return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+        } else if (Array.isArray(value)) {
+          return value.every(email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+        }
+        return false;
+      }
+    ).required('L\'email d\'expéditeur est requis'),
     recipients: Yup.string().required('La liste des destinataires est requise')
   });
 
@@ -240,15 +251,26 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
           throw new Error(`Les adresses email suivantes sont invalides: ${invalidEmails.join(', ')}`);
         }
         
+        // S'assurer que subject, fromName et fromEmail sont correctement formatés
+        const subjectValue = Array.isArray(values.subject) ? values.subject : [values.subject];
+        const fromNameValue = Array.isArray(values.fromName) ? values.fromName : [values.fromName];
+        const fromEmailValue = Array.isArray(values.fromEmail) ? values.fromEmail : [values.fromEmail];
+        
+        console.log("⚠️ Valeurs pour l'envoi:", {
+          subject: subjectValue,
+          fromName: fromNameValue,
+          fromEmail: fromEmailValue
+        });
+        
         const campaignData: EmailCampaign = {
           campaignId: campaignId || uuidv4(),
           userId: currentUser.userId,
           name: values.name,
           templateId: values.templateId,
           smtpProviderId: values.smtpProviderId,
-          subject: values.subject,
-          fromName: values.fromName,
-          fromEmail: values.fromEmail,
+          subject: subjectValue.length === 1 ? subjectValue[0] : subjectValue,
+          fromName: fromNameValue.length === 1 ? fromNameValue[0] : fromNameValue,
+          fromEmail: fromEmailValue.length === 1 ? fromEmailValue[0] : fromEmailValue,
           recipients: recipientsArray,
           status: isScheduled ? 'scheduled' : 'draft',
           scheduledAt: isScheduled && scheduledDate ? scheduledDate.toISOString() : null,
@@ -269,6 +291,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
             openRate: 0,
             deliveryRate: 0
           },
+          content: values.content || '',
           rotationOptions: values.rotationOptions
         };
         
@@ -748,6 +771,12 @@ jane.doe@exemple.com"
               console.log("⚠️ Valeurs sujets après split:", subjects);
               formik.setFieldValue('subject', subjects.length > 1 ? subjects : subjects[0] || '');
             }}
+            onKeyDown={(e) => {
+              // Ne pas empêcher l'événement par défaut pour la touche Entrée
+              if (e.key === 'Enter') {
+                e.stopPropagation(); // Empêche la soumission du formulaire
+              }
+            }}
             required
           />
         </Grid>
@@ -776,6 +805,12 @@ jane.doe@exemple.com"
               console.log("⚠️ Valeurs noms après split:", names);
               formik.setFieldValue('fromName', names.length > 1 ? names : names[0] || '');
             }}
+            onKeyDown={(e) => {
+              // Ne pas empêcher l'événement par défaut pour la touche Entrée
+              if (e.key === 'Enter') {
+                e.stopPropagation(); // Empêche la soumission du formulaire
+              }
+            }}
             required
           />
         </Grid>
@@ -796,6 +831,12 @@ jane.doe@exemple.com"
               const emails = text.split('\n').filter(email => email.trim().length > 0);
               console.log("⚠️ Valeurs emails après split:", emails);
               formik.setFieldValue('fromEmail', emails.length > 1 ? emails : emails[0] || '');
+            }}
+            onKeyDown={(e) => {
+              // Ne pas empêcher l'événement par défaut pour la touche Entrée
+              if (e.key === 'Enter') {
+                e.stopPropagation(); // Empêche la soumission du formulaire
+              }
             }}
             required
           />
