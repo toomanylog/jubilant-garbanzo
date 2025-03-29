@@ -136,9 +136,13 @@ const EditSmtpProvider: React.FC = () => {
     serialized: JSON.stringify(provider)
   });
   
+  // Cloner le provider pour éviter les problèmes de référence
+  const providerClone = JSON.parse(JSON.stringify(provider));
+  console.log("⚠️ EditSmtpProvider - Provider cloné:", providerClone);
+  
   return (
     <Layout title="Modification du fournisseur SMTP">
-      <SmtpProviderForm initialValues={provider} isEditing={true} />
+      <SmtpProviderForm initialValues={providerClone} isEditing={true} />
     </Layout>
   );
 };
