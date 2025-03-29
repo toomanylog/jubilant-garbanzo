@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Typography, CircularProgress, Alert } from '@mui/material';
+import { Box, Typography, CircularProgress, Alert, Button } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Layout from '../../components/layout/Layout';
 import SmtpProviderForm from './SmtpProviderForm';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,6 +22,7 @@ const EditSmtpProvider: React.FC = () => {
           currentUser: !!currentUser, 
           providerId 
         });
+        setError("Impossible de charger le fournisseur: identifiant manquant ou utilisateur non connecté");
         setIsLoading(false);
         return;
       }
@@ -33,7 +35,7 @@ const EditSmtpProvider: React.FC = () => {
         
         // Récupération du fournisseur SMTP par son ID
         const providerData = await getSmtpProviderById(providerId);
-        console.log("⚠️ EditSmtpProvider - Fournisseur récupéré:", providerData ? providerData.name : "null");
+        console.log("⚠️ EditSmtpProvider - Fournisseur récupéré:", providerData ? JSON.stringify(providerData) : "null");
         
         // Vérifier que le fournisseur appartient bien à l'utilisateur courant
         if (providerData.userId !== currentUser.userId) {
@@ -42,6 +44,7 @@ const EditSmtpProvider: React.FC = () => {
             currentUserId: currentUser.userId
           });
           setError("Vous n'avez pas les droits pour modifier ce fournisseur SMTP");
+          setIsLoading(false);
           return;
         }
         
@@ -50,7 +53,7 @@ const EditSmtpProvider: React.FC = () => {
         setProvider(providerData);
       } catch (err: any) {
         console.error('⚠️ EditSmtpProvider - Erreur lors de la récupération du fournisseur SMTP:', err);
-        setError(err.message || 'Une erreur est survenue');
+        setError(err.message || 'Une erreur est survenue lors du chargement du fournisseur SMTP');
       } finally {
         setIsLoading(false);
       }
@@ -63,7 +66,7 @@ const EditSmtpProvider: React.FC = () => {
   if (isLoading) {
     return (
       <Layout title="Modification du fournisseur SMTP">
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <Box className="flex justify-center items-center h-[50vh]">
           <CircularProgress />
         </Box>
       </Layout>
@@ -74,14 +77,18 @@ const EditSmtpProvider: React.FC = () => {
   if (error) {
     return (
       <Layout title="Modification du fournisseur SMTP">
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" className="mb-4 rounded-lg">
           {error}
         </Alert>
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="body1">
-            Retourner à la <a href="/smtp-providers">liste des fournisseurs</a>.
-          </Typography>
-        </Box>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/smtp-providers')}
+          className="mt-4"
+        >
+          Retour à la liste des fournisseurs
+        </Button>
       </Layout>
     );
   }
@@ -90,14 +97,18 @@ const EditSmtpProvider: React.FC = () => {
   if (!provider) {
     return (
       <Layout title="Modification du fournisseur SMTP">
-        <Alert severity="warning">
+        <Alert severity="warning" className="mb-4 rounded-lg">
           Le fournisseur SMTP demandé n'existe pas.
         </Alert>
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="body1">
-            Retourner à la <a href="/smtp-providers">liste des fournisseurs</a>.
-          </Typography>
-        </Box>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/smtp-providers')}
+          className="mt-4"
+        >
+          Retour à la liste des fournisseurs
+        </Button>
       </Layout>
     );
   }
@@ -106,16 +117,13 @@ const EditSmtpProvider: React.FC = () => {
   console.log("⚠️ EditSmtpProvider - Rendu du formulaire avec les données:", {
     name: provider.name,
     providerType: provider.providerType,
+    host: provider.host,
+    port: provider.port,
+    senders: provider.senders?.length || 0
   });
   
   return (
     <Layout title="Modification du fournisseur SMTP">
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1">
-          Modifier le fournisseur SMTP
-        </Typography>
-      </Box>
-      
       <SmtpProviderForm initialValues={provider} isEditing={true} />
     </Layout>
   );

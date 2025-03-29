@@ -12,6 +12,12 @@ export interface User {
 }
 
 // Interface pour les fournisseurs SMTP
+export interface SmtpSender {
+  email: string;
+  name: string;
+  isActive: boolean;
+}
+
 export interface SmtpProvider {
   providerId: string;
   userId: string;
@@ -25,6 +31,9 @@ export interface SmtpProvider {
   region?: string;
   isDefault: boolean;
   requiresTls?: boolean;
+  senders?: SmtpSender[];
+  senderRotationEnabled?: boolean;
+  senderRotationType?: 'sequential' | 'random';
   createdAt: string;
   updatedAt: string;
 }
