@@ -4,7 +4,7 @@ import AWS from 'aws-sdk';
 // Configuration des identifiants AWS à partir des variables d'environnement
 // Ces identifiants sont utilisés uniquement pour accéder à DynamoDB et les services AWS du backend
 const awsConfig = {
-  region: process.env.REACT_APP_AWS_REGION || '',
+  region: process.env.REACT_APP_AWS_REGION || 'eu-north-1',
   credentials: {
     accessKeyId: process.env.REACT_APP_AWS_ACCESS_KEY || '',
     secretAccessKey: process.env.REACT_APP_AWS_SECRET_KEY || ''
@@ -19,6 +19,12 @@ console.log('- Secret Key disponible:', !!awsConfig.credentials.secretAccessKey)
 
 // Configuration d'AWS SDK pour DynamoDB
 AWS.config.update(awsConfig);
+
+// S'assurer que tous les services AWS utilisent la même configuration
+AWS.config.update({
+  region: awsConfig.region,
+  credentials: awsConfig.credentials
+});
 
 // Configuration d'Amplify avec cast temporaire pour éviter les erreurs de type
 Amplify.configure({
