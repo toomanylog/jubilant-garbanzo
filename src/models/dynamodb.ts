@@ -44,16 +44,6 @@ export interface SmtpProvider {
   lastQuotaReset?: string; // Date de la dernière réinitialisation du quota
   isActive?: boolean;      // Indique si le fournisseur est actif ou inactif
   priority?: number;       // Priorité du fournisseur (plus petit = plus prioritaire)
-  // Nouveaux paramètres pour les webhooks personnalisés
-  webhookSettings?: {
-    enabled: boolean;
-    bounceUrl?: string;     // URL personnalisée pour les notifications de bounce
-    deliveryUrl?: string;   // URL personnalisée pour les confirmations de livraison
-    openUrl?: string;       // URL personnalisée pour les notifications d'ouverture
-    clickUrl?: string;      // URL personnalisée pour les notifications de clic
-    complaintUrl?: string;  // URL personnalisée pour les plaintes
-    useDefaultWebhooks?: boolean; // Utiliser les webhooks par défaut du système
-  };
 }
 
 // Interface pour les templates d'emails

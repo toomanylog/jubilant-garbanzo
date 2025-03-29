@@ -157,8 +157,10 @@ export class TemplateService {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>Email</title>
 </head>
-<body>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif;">
 </body>
 </html>`;
     }
@@ -171,39 +173,52 @@ export class TemplateService {
     const hasBodyTag = /<body\b[^>]*>/i.test(htmlContent);
     // Vérifier si le contenu a déjà des balises head
     const hasHeadTag = /<head\b[^>]*>/i.test(htmlContent);
+    // Vérifier si le meta Content-Type est présent
+    const hasContentType = htmlContent.toLowerCase().includes('content-type');
 
-    // Si le contenu a déjà une structure complète, le retourner tel quel
-    if (hasDoctype && hasHtmlTag && hasHeadTag && hasBodyTag) {
+    // Si le contenu a déjà une structure complète avec Content-Type, le retourner tel quel
+    if (hasDoctype && hasHtmlTag && hasHeadTag && hasBodyTag && hasContentType) {
       return htmlContent;
     }
 
-    // Si le contenu a déjà des balises body mais pas de structure complète,
-    // ajouter uniquement les balises manquantes
-    if (hasBodyTag && !hasDoctype) {
-      return `<!DOCTYPE html>\n${htmlContent}`;
-    }
-
-    if (hasBodyTag && !hasHtmlTag) {
-      return `<!DOCTYPE html>\n<html>\n${htmlContent}\n</html>`;
-    }
-
-    if (hasBodyTag && !hasHeadTag) {
-      // Insérer la balise head avant la balise body
-      return htmlContent.replace(/<body/i, '<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body');
-    }
-
-    // Si le contenu n'a pas de structure HTML du tout, l'envelopper dans une structure complète
-    if (!hasBodyTag) {
+    // Si le contenu est un fragment HTML sans structure document complète
+    if (!hasDoctype || !hasHtmlTag) {
       return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>Email</title>
 </head>
-<body>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif;">
   ${htmlContent}
 </body>
 </html>`;
+    }
+
+    // Si le contenu a des balises html et body mais pas de head
+    if (hasHtmlTag && hasBodyTag && !hasHeadTag) {
+      return htmlContent.replace(/<html[^>]*>/i, 
+        `<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>Email</title>
+</head>`);
+    }
+
+    // Si le contenu a des balises head mais sans Content-Type
+    if (hasHeadTag && !hasContentType) {
+      return htmlContent.replace(/<head[^>]*>/i, 
+        `<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">`);
+    }
+
+    // Si le contenu a un head et un body mais pas de doctype
+    if (!hasDoctype && hasHtmlTag) {
+      return `<!DOCTYPE html>\n${htmlContent}`;
     }
 
     // Par défaut, retourner le contenu tel quel

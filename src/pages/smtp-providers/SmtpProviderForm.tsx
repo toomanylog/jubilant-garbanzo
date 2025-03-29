@@ -33,11 +33,7 @@ import {
   DialogActions,
   RadioGroup,
   Radio,
-  Checkbox,
-  CardHeader,
-  Tooltip,
-  FormGroup,
-  AlertTitle
+  Checkbox
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import { useFormik } from 'formik';
@@ -52,7 +48,6 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { SelectChangeEvent } from '@mui/material/Select';
-import InfoIcon from '@mui/icons-material/Info';
 
 import Layout from '../../components/layout/Layout';
 import { useAuth } from '../../contexts/AuthContext';
@@ -62,24 +57,6 @@ import {
   createSmtpProvider, 
   updateSmtpProvider
 } from '../../models/dynamodb';
-
-// Correction de l'interface SmtpProviderWithWebhooks
-interface SmtpProviderWithWebhooks extends SmtpProvider {
-  webhookSettings?: {
-    enabled: boolean;
-    bounceUrl?: string;
-    deliveryUrl?: string;
-    openUrl?: string;
-    clickUrl?: string;
-    complaintUrl?: string;
-    useDefaultWebhooks?: boolean;
-  };
-}
-
-// Type pour les valeurs du formulaire qui inclut webhookSettings
-interface FormValues extends Omit<SmtpProviderWithWebhooks, 'port'> {
-  port: string | number;
-}
 
 // Liste des régions AWS
 const AWS_REGIONS = [
@@ -115,21 +92,8 @@ const AWS_REGIONS = [
 
 // Props pour le composant
 interface SmtpProviderFormProps {
-  initialValues?: SmtpProviderWithWebhooks;
+  initialValues?: SmtpProvider;
   isEditing?: boolean;
-}
-
-// Ajouter une fonction utilitaire pour vérifier la structure de webhookSettings
-const isWebhookSettings = (obj: any): obj is {
-  enabled: boolean;
-  bounceUrl?: string;
-  deliveryUrl?: string;
-  openUrl?: string;
-  clickUrl?: string;
-  complaintUrl?: string;
-  useDefaultWebhooks?: boolean;
-} => {
-  return obj && typeof obj === 'object' && 'enabled' in obj;
 }
 
 const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({ 
@@ -163,8 +127,8 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
     }
   }, [initialValues, isEditing]);
 
-  // Valeurs par défaut du formulaire avec webhookSettings
-  const defaultValues: FormValues = {
+  // Valeurs par défaut du formulaire
+  const defaultValues = {
     name: '',
     providerType: 'custom_smtp' as const,
     host: '',
@@ -183,21 +147,10 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
     priority: 1,
     isActive: true,
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    webhookSettings: {
-      enabled: false,
-      useDefaultWebhooks: true,
-      bounceUrl: '',
-      deliveryUrl: '',
-      openUrl: '',
-      clickUrl: '',
-      complaintUrl: ''
-    },
-    providerId: '',
-    userId: ''
+    updatedAt: new Date().toISOString()
   };
 
-  // Schéma de validation mis à jour
+  // Schéma de validation
   const validationSchema = Yup.object().shape({
     name: Yup.string().required('Le nom est requis'),
     providerType: Yup.string().required('Le type de provider est requis'),
@@ -230,83 +183,7 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
     sendingRatePerHour: Yup.number().min(0, 'Le taux d\'envoi ne peut pas être négatif'),
     sendingRatePerDay: Yup.number().min(0, 'Le taux d\'envoi ne peut pas être négatif'),
     dailyQuota: Yup.number().min(0, 'Le quota ne peut pas être négatif'),
-    priority: Yup.number().min(0, 'La priorité ne peut pas être négative'),
-    
-    // Validation pour webhookSettings
-    webhookSettings: Yup.object().shape({
-      enabled: Yup.boolean(),
-      useDefaultWebhooks: Yup.boolean(),
-      bounceUrl: Yup.string().test(
-        'url-check',
-        'URL invalide',
-        function(value) {
-          const { enabled, useDefaultWebhooks } = this.parent;
-          if (!enabled || useDefaultWebhooks || !value) return true;
-          try {
-            new URL(value);
-            return true;
-          } catch (e) {
-            return false;
-          }
-        }
-      ),
-      deliveryUrl: Yup.string().test(
-        'url-check',
-        'URL invalide',
-        function(value) {
-          const { enabled, useDefaultWebhooks } = this.parent;
-          if (!enabled || useDefaultWebhooks || !value) return true;
-          try {
-            new URL(value);
-            return true;
-          } catch (e) {
-            return false;
-          }
-        }
-      ),
-      openUrl: Yup.string().test(
-        'url-check',
-        'URL invalide',
-        function(value) {
-          const { enabled, useDefaultWebhooks } = this.parent;
-          if (!enabled || useDefaultWebhooks || !value) return true;
-          try {
-            new URL(value);
-            return true;
-          } catch (e) {
-            return false;
-          }
-        }
-      ),
-      clickUrl: Yup.string().test(
-        'url-check',
-        'URL invalide',
-        function(value) {
-          const { enabled, useDefaultWebhooks } = this.parent;
-          if (!enabled || useDefaultWebhooks || !value) return true;
-          try {
-            new URL(value);
-            return true;
-          } catch (e) {
-            return false;
-          }
-        }
-      ),
-      complaintUrl: Yup.string().test(
-        'url-check',
-        'URL invalide',
-        function(value) {
-          const { enabled, useDefaultWebhooks } = this.parent;
-          if (!enabled || useDefaultWebhooks || !value) return true;
-          try {
-            new URL(value);
-            return true;
-          } catch (e) {
-            return false;
-          }
-        }
-      ),
-    }).nullable()
+    priority: Yup.number().min(0, 'La priorité ne peut pas être négative')
   });
   
   // Gestion du formulaire avec Formik
@@ -322,8 +199,7 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
     }
   }, [initialValues, formInitialized]);
 
-  // Utiliser FormValues pour le type du formulaire
-  const formik = useFormik<FormValues>({
+  const formik = useFormik({
     initialValues: initialValues ? {
       ...initialValues,
       port: initialValues.port || 587,
@@ -333,18 +209,9 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
       sendingRatePerDay: initialValues.sendingRatePerDay || 0,
       dailyQuota: initialValues.dailyQuota || 0,
       priority: initialValues.priority || 1,
-      isActive: initialValues.isActive !== false,
-      webhookSettings: initialValues.webhookSettings || {
-        enabled: false,
-        useDefaultWebhooks: true,
-        bounceUrl: '',
-        deliveryUrl: '',
-        openUrl: '',
-        clickUrl: '',
-        complaintUrl: ''
-      }
+      isActive: initialValues.isActive !== false
     } : defaultValues,
-    enableReinitialize: true,
+    enableReinitialize: true, // Permettre à Formik de réinitialiser le formulaire quand initialValues change
     validationSchema,
     onSubmit: async (values) => {
       if (!currentUser) return;
@@ -356,7 +223,7 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
         // Copie des valeurs sans les propriétés à transformer
         const { port, ...otherValues } = values;
         
-        const providerData: SmtpProviderWithWebhooks = {
+        const providerData: SmtpProvider = {
           ...otherValues,
           userId: currentUser.userId,
           providerId: initialValues?.providerId || uuidv4(),
@@ -373,7 +240,6 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
           isActive: values.isActive || true,
           requiresTls: values.requiresTls || false,
           isDefault: values.isDefault || false,
-          webhookSettings: values.webhookSettings,
           region: values.region as 'us-east-1' | 'us-east-2' | 'us-west-1' | 'us-west-2' | 'ca-central-1' | 'eu-west-1' | 'eu-west-2' | 'eu-west-3' | 'eu-central-1' | 'eu-north-1' | 'eu-south-1' | 'ap-east-1' | 'ap-south-1' | 'ap-northeast-1' | 'ap-northeast-2' | 'ap-northeast-3' | 'ap-southeast-1' | 'ap-southeast-2' | 'sa-east-1' | 'me-south-1' | 'af-south-1'
         };
         
@@ -415,16 +281,7 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
           sendingRatePerDay: initialValues.sendingRatePerDay || 0,
           dailyQuota: initialValues.dailyQuota || 0,
           priority: initialValues.priority || 1,
-          isActive: initialValues.isActive !== false,
-          webhookSettings: initialValues.webhookSettings || {
-            enabled: false,
-            useDefaultWebhooks: true,
-            bounceUrl: '',
-            deliveryUrl: '',
-            openUrl: '',
-            clickUrl: '',
-            complaintUrl: ''
-          }
+          isActive: initialValues.isActive !== false
         }
       });
       
@@ -864,191 +721,6 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
               </Grid>
             </Box>
           </form>
-        </CardContent>
-      </Card>
-
-      {/* Ajouter une nouvelle section pour les webhooks personnalisés */}
-      <Card elevation={1} sx={{ mb: 3 }} className="rounded-lg border border-gray-100">
-        <CardHeader 
-          title="Paramètres des Webhooks" 
-          className="border-b border-gray-100 bg-gray-50 px-4 py-3"
-          titleTypographyProps={{ variant: 'subtitle1', className: 'font-medium' }}
-          action={
-            <Tooltip title="Configurer les webhooks pour les notifications d'emails">
-              <IconButton aria-label="info">
-                <InfoIcon />
-              </IconButton>
-            </Tooltip>
-          }
-        />
-        <CardContent>
-          <FormGroup>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formik.values.webhookSettings?.enabled || false}
-                  onChange={(e) => {
-                    formik.setFieldValue('webhookSettings.enabled', e.target.checked);
-                    // Si c'est activé et que les webhooks n'existent pas encore, créer l'objet
-                    if (e.target.checked && !formik.values.webhookSettings) {
-                      formik.setFieldValue('webhookSettings', {
-                        enabled: true,
-                        useDefaultWebhooks: true,
-                        bounceUrl: '',
-                        deliveryUrl: '',
-                        openUrl: '',
-                        clickUrl: '',
-                        complaintUrl: ''
-                      });
-                    }
-                  }}
-                  name="webhookSettings.enabled"
-                />
-              }
-              label="Activer les notifications webhooks"
-            />
-          </FormGroup>
-
-          {formik.values.webhookSettings?.enabled && (
-            <>
-              <FormGroup sx={{ mt: 2 }}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={formik.values.webhookSettings?.useDefaultWebhooks || false}
-                      onChange={(e) => formik.setFieldValue('webhookSettings.useDefaultWebhooks', e.target.checked)}
-                      name="webhookSettings.useDefaultWebhooks"
-                    />
-                  }
-                  label="Utiliser les webhooks par défaut du système"
-                />
-                <FormHelperText>
-                  Activez cette option pour utiliser les endpoints par défaut fournis par North Eyes. 
-                  Désactivez-la pour configurer vos propres URLs d'endpoint.
-                </FormHelperText>
-              </FormGroup>
-
-              {!formik.values.webhookSettings?.useDefaultWebhooks && isWebhookSettings(formik.values.webhookSettings) && (
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    URLs des Webhooks Personnalisés
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    id="bounceUrl"
-                    name="webhookSettings.bounceUrl"
-                    label="URL de notification de rebond (bounce)"
-                    variant="outlined"
-                    margin="normal"
-                    value={formik.values.webhookSettings.bounceUrl || ''}
-                    onChange={formik.handleChange}
-                    error={Boolean(isWebhookSettings(formik.touched.webhookSettings) && 
-                           formik.touched.webhookSettings.bounceUrl && 
-                           isWebhookSettings(formik.errors.webhookSettings) && 
-                           formik.errors.webhookSettings.bounceUrl)}
-                    helperText={
-                      (isWebhookSettings(formik.touched.webhookSettings) && 
-                       formik.touched.webhookSettings.bounceUrl && 
-                       isWebhookSettings(formik.errors.webhookSettings) && 
-                       formik.errors.webhookSettings.bounceUrl) || 
-                      "URL qui sera appelée lorsqu'un email rebondit"
-                    }
-                  />
-                  <TextField
-                    fullWidth
-                    id="deliveryUrl"
-                    name="webhookSettings.deliveryUrl"
-                    label="URL de confirmation de livraison"
-                    variant="outlined"
-                    margin="normal"
-                    value={formik.values.webhookSettings.deliveryUrl || ''}
-                    onChange={formik.handleChange}
-                    error={Boolean(isWebhookSettings(formik.touched.webhookSettings) && 
-                           formik.touched.webhookSettings.deliveryUrl && 
-                           isWebhookSettings(formik.errors.webhookSettings) && 
-                           formik.errors.webhookSettings.deliveryUrl)}
-                    helperText={
-                      (isWebhookSettings(formik.touched.webhookSettings) && 
-                       formik.touched.webhookSettings.deliveryUrl && 
-                       isWebhookSettings(formik.errors.webhookSettings) && 
-                       formik.errors.webhookSettings.deliveryUrl) || 
-                      "URL qui sera appelée lorsqu'un email est livré"
-                    }
-                  />
-                  <TextField
-                    fullWidth
-                    id="openUrl"
-                    name="webhookSettings.openUrl"
-                    label="URL de notification d'ouverture"
-                    variant="outlined"
-                    margin="normal"
-                    value={formik.values.webhookSettings.openUrl || ''}
-                    onChange={formik.handleChange}
-                    error={Boolean(isWebhookSettings(formik.touched.webhookSettings) && 
-                           formik.touched.webhookSettings.openUrl && 
-                           isWebhookSettings(formik.errors.webhookSettings) && 
-                           formik.errors.webhookSettings.openUrl)}
-                    helperText={
-                      (isWebhookSettings(formik.touched.webhookSettings) && 
-                       formik.touched.webhookSettings.openUrl && 
-                       isWebhookSettings(formik.errors.webhookSettings) && 
-                       formik.errors.webhookSettings.openUrl) || 
-                      "URL qui sera appelée lorsqu'un email est ouvert"
-                    }
-                  />
-                  <TextField
-                    fullWidth
-                    id="clickUrl"
-                    name="webhookSettings.clickUrl"
-                    label="URL de notification de clic"
-                    variant="outlined"
-                    margin="normal"
-                    value={formik.values.webhookSettings.clickUrl || ''}
-                    onChange={formik.handleChange}
-                    error={Boolean(isWebhookSettings(formik.touched.webhookSettings) && 
-                           formik.touched.webhookSettings.clickUrl && 
-                           isWebhookSettings(formik.errors.webhookSettings) && 
-                           formik.errors.webhookSettings.clickUrl)}
-                    helperText={
-                      (isWebhookSettings(formik.touched.webhookSettings) && 
-                       formik.touched.webhookSettings.clickUrl && 
-                       isWebhookSettings(formik.errors.webhookSettings) && 
-                       formik.errors.webhookSettings.clickUrl) || 
-                      "URL qui sera appelée lorsqu'un lien est cliqué"
-                    }
-                  />
-                  <TextField
-                    fullWidth
-                    id="complaintUrl"
-                    name="webhookSettings.complaintUrl"
-                    label="URL de notification de plainte"
-                    variant="outlined"
-                    margin="normal"
-                    value={formik.values.webhookSettings.complaintUrl || ''}
-                    onChange={formik.handleChange}
-                    error={Boolean(isWebhookSettings(formik.touched.webhookSettings) && 
-                           formik.touched.webhookSettings.complaintUrl && 
-                           isWebhookSettings(formik.errors.webhookSettings) && 
-                           formik.errors.webhookSettings.complaintUrl)}
-                    helperText={
-                      (isWebhookSettings(formik.touched.webhookSettings) && 
-                       formik.touched.webhookSettings.complaintUrl && 
-                       isWebhookSettings(formik.errors.webhookSettings) && 
-                       formik.errors.webhookSettings.complaintUrl) || 
-                      "URL qui sera appelée lorsqu'un email est marqué comme spam"
-                    }
-                  />
-                </Box>
-              )}
-            </>
-          )}
-
-          <Alert severity="info" sx={{ mt: 2 }}>
-            <AlertTitle>Configuration des webhooks sur votre fournisseur SMTP</AlertTitle>
-            Pour que les notifications fonctionnent correctement, vous devez également configurer ces URLs dans 
-            votre compte fournisseur SMTP (AWS SES, Sendgrid, Mailjet, etc.). Consultez la documentation de votre 
-            fournisseur pour plus d'informations.
-          </Alert>
         </CardContent>
       </Card>
     </Layout>

@@ -490,7 +490,7 @@ export class CampaignService {
       .trim();
   }
 
-  // Personnalise le contenu avec les variables de l'utilisateur
+  // Personnalise le contenu avec les variables de l'utilisateur et s'assure qu'il est bien formaté pour l'email
   private static personalizeContent(content: string, variables: Record<string, any>): string {
     let result = content;
     
@@ -502,6 +502,33 @@ export class CampaignService {
     
     // Supprimer les variables non remplacées
     result = result.replace(/{{(\s*[\w\.]+\s*)}}/g, '');
+    
+    // Vérifier si le contenu a une structure HTML complète
+    if (!result.toLowerCase().includes('<!doctype html')) {
+      // Ajouter le doctype s'il n'existe pas
+      if (!result.toLowerCase().includes('<html')) {
+        // Envelopper le contenu dans une structure HTML complète
+        result = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+</head>
+<body>
+  ${result}
+</body>
+</html>`;
+      } else {
+        // Ajouter uniquement le doctype
+        result = `<!DOCTYPE html>\n${result}`;
+      }
+    }
+    
+    // S'assurer que la balise Content-Type est présente dans le head
+    if (!result.toLowerCase().includes('content-type') && result.toLowerCase().includes('<head>')) {
+      result = result.replace(/<head>/i, '<head>\n  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">');
+    }
     
     return result;
   }

@@ -330,6 +330,22 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
               className="rounded-md mb-4 font-mono"
               placeholder="Entrez votre code HTML ici..."
             />
+            <div className="mt-2 text-gray-500 text-sm">
+              <p className="font-medium text-amber-600 mb-1">Conseil pour email HTML:</p>
+              <p>Pour assurer un affichage correct dans tous les clients mail, incluez une structure HTML complète avec:</p>
+              <pre className="bg-gray-100 p-2 mt-1 text-xs overflow-auto">
+{`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+</head>
+<body>
+  <!-- Votre contenu ici -->
+</body>
+</html>`}
+              </pre>
+            </div>
           </Box>
         </Card>
         
