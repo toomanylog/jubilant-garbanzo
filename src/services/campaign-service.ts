@@ -7,11 +7,21 @@ import {
   updateEmailCampaign,
   getEmailCampaignById,
   EmailTemplate,
-  SmtpProvider
+  SmtpProvider,
+  Recipient,
+  EmailCampaignStats,
+  AwsSmtpDetails,
+  createCampaignItem,
+  getCampaigns,
+  getCampaign,
+  updateCampaign,
+  deleteCampaign,
+  updateEmailTrackingStatus
 } from '../models/dynamodb';
 import { createSmtpService, EmailOptions } from './smtp-service';
 import { TemplateService } from './template-service';
 import { SmtpProviderService } from './smtp-provider-service';
+import { TrackingService } from './tracking-service';
 import AWS from 'aws-sdk';
 
 // Initialiser DynamoDB
@@ -84,7 +94,12 @@ export class CampaignService {
           opened: 0,
           clicked: 0,
           bounced: 0,
-          complaints: 0
+          complaints: 0,
+          softBounces: 0,
+          hardBounces: 0,
+          clickRate: 0,
+          openRate: 0,
+          deliveryRate: 0
         }
       };
       
@@ -230,6 +245,29 @@ export class CampaignService {
               ...recipient.variables
             });
 
+            // Générer un messageId unique
+            const messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+            
+            // Initialiser le tracking pour cet email
+            const trackingItem = await TrackingService.initializeTracking(
+              campaignId, 
+              recipient.email, 
+              messageId,
+              typeof template.templateId === 'string' ? template.templateId : template.templateId[0]
+            );
+
+            // Préparer le HTML avec les éléments de tracking si le tracking est disponible
+            let htmlWithTracking = personalizedHtml;
+            if (trackingItem) {
+              htmlWithTracking = TrackingService.prepareHtmlWithTracking(
+                personalizedHtml,
+                campaignId,
+                recipient.email,
+                trackingItem.messageId,
+                trackingItem
+              );
+            }
+
             // Envoi de l'email
             const result = await smtpService.sendEmail({
               to: recipient.email,
@@ -238,7 +276,7 @@ export class CampaignService {
                 name: campaign.fromName || 'North Eyes'
               },
               subject: personalizedSubject,
-              html: personalizedHtml,
+              html: htmlWithTracking,
               text: this.htmlToText(personalizedHtml),
               replyTo: campaign.fromEmail,
               variables: recipient.variables
@@ -248,11 +286,22 @@ export class CampaignService {
             if (result.success) {
               successCount++;
               
-              // Enregistrer le suivi de l'email envoyé
-              await this.trackEmailSent(campaignId, recipient.email, result.messageId, template.templateId);
+              // Mettre à jour l'item de tracking avec le messageId réel si disponible
+              if (result.messageId && trackingItem) {
+                await updateEmailTrackingStatus(trackingItem.id, 'sent', { messageId: result.messageId });
+              }
             } else if (result.error?.includes('bounce')) {
               bounceCount++;
               failureCount++;
+              
+              // Traiter le bounce si le tracking est disponible
+              if (trackingItem) {
+                await TrackingService.trackBounce(
+                  trackingItem.messageId,
+                  result.error.includes('permanent') ? 'hard' : 'soft',
+                  result.error
+                );
+              }
             } else {
               failureCount++;
             }
@@ -264,6 +313,9 @@ export class CampaignService {
                 failed: failureCount,
                 bounces: bounceCount
               });
+              
+              // Mettre à jour les statistiques complètes via TrackingService
+              await TrackingService.updateCampaignStats(campaignId);
             }
 
             return result;
@@ -335,21 +387,8 @@ export class CampaignService {
   // Enregistre le suivi d'un email envoyé
   private static async trackEmailSent(campaignId: string, recipientEmail: string, messageId?: string, templateId?: string): Promise<void> {
     try {
-      await dynamoDB.put({
-        TableName: 'EmailTracking',
-        Item: {
-          id: `${campaignId}:${recipientEmail}`,
-          campaignId,
-          recipientEmail,
-          messageId: messageId || `msg-${Date.now()}`,
-          sentTimestamp: Date.now(),
-          status: 'sent',
-          openedTimestamp: null,
-          clickedTimestamp: null,
-          clickedLinks: [],
-          templateId
-        }
-      }).promise();
+      // Créer l'item de tracking directement via le TrackingService pour initialiser tous les éléments nécessaires
+      await TrackingService.initializeTracking(campaignId, recipientEmail, messageId || `msg-${Date.now()}`, templateId);
     } catch (error) {
       console.error('Erreur lors de l\'enregistrement du suivi:', error);
     }

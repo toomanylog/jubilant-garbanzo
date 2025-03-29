@@ -232,7 +232,12 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
             opened: 0,
             clicked: 0,
             bounced: 0,
-            complaints: 0
+            complaints: 0,
+            softBounces: 0,
+            hardBounces: 0,
+            clickRate: 0,
+            openRate: 0,
+            deliveryRate: 0
           }
         };
         

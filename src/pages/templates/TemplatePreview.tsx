@@ -251,7 +251,7 @@ const TemplatePreview: React.FC = () => {
               Expéditeur
             </Typography>
             <Typography variant="body1" gutterBottom>
-              {template.fromName} &lt;{template.fromEmail}&gt;
+              Défini lors de la création de la campagne
             </Typography>
           </Paper>
         </Box>

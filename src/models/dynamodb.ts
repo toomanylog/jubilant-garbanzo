@@ -68,6 +68,12 @@ export interface EmailCampaignStats {
   clicked: number;
   bounced: number;
   complaints: number;
+  // Ajout de nouvelles statistiques
+  softBounces: number;
+  hardBounces: number;
+  clickRate: number;
+  openRate: number;
+  deliveryRate: number;
 }
 
 export interface EmailCampaign {
@@ -94,6 +100,44 @@ export interface UserSettings {
   testEmails: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+// Interface pour le tracking des emails
+export interface EmailTrackingItem {
+  id: string; // Combinaison de campaignId:recipientEmail
+  campaignId: string;
+  recipientEmail: string;
+  messageId: string;
+  sentTimestamp: number;
+  status: 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained';
+  openedTimestamp: number | null;
+  clickedTimestamp: number | null;
+  clickedLinks: {url: string, timestamp: number}[];
+  templateId?: string;
+  bounceType?: 'hard' | 'soft';
+  bounceReason?: string;
+  deliveredTimestamp?: number | null;
+  pixelId: string; // ID unique pour le pixel de tracking
+}
+
+// Interface pour les événements de tracking (webhooks)
+export interface EmailEvent {
+  id: string;
+  timestamp: number;
+  eventType: 'send' | 'delivery' | 'open' | 'click' | 'bounce' | 'complaint';
+  messageId: string;
+  campaignId: string;
+  recipientEmail: string;
+  metadata?: Record<string, any>;
+}
+
+// Interface pour les paramètres de suivi
+export interface TrackingSettings {
+  trackOpens: boolean;
+  trackClicks: boolean;
+  trackBounces: boolean;
+  pixelEnabled: boolean;
+  linkTracking: boolean;
 }
 
 // Fonctions pour interagir avec DynamoDB
@@ -559,6 +603,282 @@ export const updateTestEmails = async (userId: string, testEmails: string[]): Pr
     return await saveUserSettings(settings);
   } catch (error) {
     console.error('Erreur lors de la mise à jour des adresses email de test:', error);
+    return false;
+  }
+};
+
+// Fonctions pour le tracking des emails
+export const createEmailTrackingItem = async (item: EmailTrackingItem): Promise<boolean> => {
+  const params = {
+    TableName: 'EmailTracking',
+    Item: item
+  };
+
+  try {
+    await dynamoDB.put(params).promise();
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de la création de l\'item de tracking:', error);
+    return false;
+  }
+};
+
+export const getEmailTrackingByMessageId = async (messageId: string): Promise<EmailTrackingItem | null> => {
+  const params = {
+    TableName: 'EmailTracking',
+    IndexName: 'MessageIdIndex',
+    KeyConditionExpression: 'messageId = :messageId',
+    ExpressionAttributeValues: {
+      ':messageId': messageId
+    },
+    Limit: 1
+  };
+
+  try {
+    const result = await dynamoDB.query(params).promise();
+    return (result.Items && result.Items.length > 0) ? result.Items[0] as EmailTrackingItem : null;
+  } catch (error) {
+    console.error('Erreur lors de la récupération du tracking par messageId:', error);
+    return null;
+  }
+};
+
+export const getEmailTrackingByCampaignId = async (campaignId: string, limit = 100, lastEvaluatedKey?: any): Promise<{items: EmailTrackingItem[], lastEvaluatedKey?: any}> => {
+  const params: any = {
+    TableName: 'EmailTracking',
+    IndexName: 'CampaignIdIndex',
+    KeyConditionExpression: 'campaignId = :campaignId',
+    ExpressionAttributeValues: {
+      ':campaignId': campaignId
+    },
+    Limit: limit
+  };
+
+  if (lastEvaluatedKey) {
+    params.ExclusiveStartKey = lastEvaluatedKey;
+  }
+
+  try {
+    const result = await dynamoDB.query(params).promise();
+    return {
+      items: result.Items as EmailTrackingItem[],
+      lastEvaluatedKey: result.LastEvaluatedKey
+    };
+  } catch (error) {
+    console.error('Erreur lors de la récupération du tracking par campaignId:', error);
+    return { items: [] };
+  }
+};
+
+export const updateEmailTrackingStatus = async (id: string, status: EmailTrackingItem['status'], additionalData?: Partial<EmailTrackingItem>): Promise<boolean> => {
+  const now = Date.now();
+  let updateExpression = 'SET #status = :status, updatedAt = :updatedAt';
+  const expressionAttributeNames: Record<string, string> = {
+    '#status': 'status'
+  };
+  const expressionAttributeValues: Record<string, any> = {
+    ':status': status,
+    ':updatedAt': now
+  };
+
+  // Ajouter des timestamps spécifiques en fonction du statut
+  if (status === 'opened' && !additionalData?.openedTimestamp) {
+    updateExpression += ', openedTimestamp = :openedTimestamp';
+    expressionAttributeValues[':openedTimestamp'] = now;
+  }
+
+  if (status === 'clicked' && !additionalData?.clickedTimestamp) {
+    updateExpression += ', clickedTimestamp = :clickedTimestamp';
+    expressionAttributeValues[':clickedTimestamp'] = now;
+  }
+
+  if (status === 'delivered' && !additionalData?.deliveredTimestamp) {
+    updateExpression += ', deliveredTimestamp = :deliveredTimestamp';
+    expressionAttributeValues[':deliveredTimestamp'] = now;
+  }
+
+  // Ajouter des données supplémentaires si fournies
+  if (additionalData) {
+    Object.entries(additionalData).forEach(([key, value], index) => {
+      if (key !== 'id' && key !== 'campaignId' && key !== 'recipientEmail') {
+        const attrName = `#attr${index}`;
+        const attrValue = `:val${index}`;
+        updateExpression += `, ${attrName} = ${attrValue}`;
+        expressionAttributeNames[attrName] = key;
+        expressionAttributeValues[attrValue] = value;
+      }
+    });
+  }
+
+  const params = {
+    TableName: 'EmailTracking',
+    Key: { id },
+    UpdateExpression: updateExpression,
+    ExpressionAttributeNames: expressionAttributeNames,
+    ExpressionAttributeValues: expressionAttributeValues,
+    ReturnValues: 'UPDATED_NEW'
+  };
+
+  try {
+    await dynamoDB.update(params).promise();
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour du statut de tracking:', error);
+    return false;
+  }
+};
+
+export const addClickToEmailTracking = async (id: string, url: string): Promise<boolean> => {
+  const now = Date.now();
+  const newClick = { url, timestamp: now };
+  
+  const params = {
+    TableName: 'EmailTracking',
+    Key: { id },
+    UpdateExpression: 'SET #status = :status, clickedTimestamp = :clickedTimestamp, clickedLinks = list_append(if_not_exists(clickedLinks, :emptyList), :newClick)',
+    ExpressionAttributeNames: {
+      '#status': 'status'
+    },
+    ExpressionAttributeValues: {
+      ':status': 'clicked',
+      ':clickedTimestamp': now,
+      ':emptyList': [],
+      ':newClick': [newClick]
+    },
+    ReturnValues: 'UPDATED_NEW'
+  };
+
+  try {
+    await dynamoDB.update(params).promise();
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de l\'ajout du clic au tracking:', error);
+    return false;
+  }
+};
+
+// Fonction pour récupérer les statistiques d'une campagne à partir des données de tracking
+export const getCampaignTracking = async (campaignId: string): Promise<EmailCampaignStats> => {
+  const baseStats: EmailCampaignStats = {
+    total: 0,
+    sent: 0,
+    delivered: 0,
+    opened: 0,
+    clicked: 0,
+    bounced: 0,
+    complaints: 0,
+    softBounces: 0,
+    hardBounces: 0,
+    clickRate: 0,
+    openRate: 0,
+    deliveryRate: 0
+  };
+
+  try {
+    // Récupérer tous les items de tracking pour cette campagne
+    let allItems: EmailTrackingItem[] = [];
+    let lastKey: any = undefined;
+    
+    do {
+      const result = await getEmailTrackingByCampaignId(campaignId, 1000, lastKey);
+      allItems = [...allItems, ...result.items];
+      lastKey = result.lastEvaluatedKey;
+    } while (lastKey);
+
+    // Calculer les statistiques
+    const stats = allItems.reduce((acc, item) => {
+      acc.total++;
+      
+      if (item.status === 'sent' || item.sentTimestamp) {
+        acc.sent++;
+      }
+      
+      if (item.status === 'delivered' || item.deliveredTimestamp) {
+        acc.delivered++;
+      }
+      
+      if (item.status === 'opened' || item.openedTimestamp) {
+        acc.opened++;
+      }
+      
+      if (item.status === 'clicked' || item.clickedTimestamp) {
+        acc.clicked++;
+      }
+      
+      if (item.status === 'bounced') {
+        acc.bounced++;
+        if (item.bounceType === 'soft') {
+          acc.softBounces++;
+        } else if (item.bounceType === 'hard') {
+          acc.hardBounces++;
+        }
+      }
+      
+      if (item.status === 'complained') {
+        acc.complaints++;
+      }
+      
+      return acc;
+    }, { ...baseStats });
+
+    // Calculer les taux
+    if (stats.sent > 0) {
+      stats.deliveryRate = parseFloat(((stats.delivered / stats.sent) * 100).toFixed(2));
+    }
+    
+    if (stats.delivered > 0) {
+      stats.openRate = parseFloat(((stats.opened / stats.delivered) * 100).toFixed(2));
+      stats.clickRate = parseFloat(((stats.clicked / stats.delivered) * 100).toFixed(2));
+    }
+
+    return stats;
+  } catch (error) {
+    console.error('Erreur lors de la récupération des statistiques de tracking:', error);
+    return baseStats;
+  }
+};
+
+// Fonction pour créer ou mettre à jour un événement d'email
+export const createEmailEvent = async (event: EmailEvent): Promise<boolean> => {
+  const params = {
+    TableName: 'EmailEvents',
+    Item: event
+  };
+
+  try {
+    await dynamoDB.put(params).promise();
+    
+    // Mettre également à jour l'item de tracking correspondant
+    const trackingId = `${event.campaignId}:${event.recipientEmail}`;
+    
+    switch (event.eventType) {
+      case 'delivery':
+        await updateEmailTrackingStatus(trackingId, 'delivered');
+        break;
+      case 'open':
+        await updateEmailTrackingStatus(trackingId, 'opened');
+        break;
+      case 'click':
+        if (event.metadata?.url) {
+          await addClickToEmailTracking(trackingId, event.metadata.url);
+        } else {
+          await updateEmailTrackingStatus(trackingId, 'clicked');
+        }
+        break;
+      case 'bounce':
+        await updateEmailTrackingStatus(trackingId, 'bounced', {
+          bounceType: event.metadata?.type,
+          bounceReason: event.metadata?.reason
+        });
+        break;
+      case 'complaint':
+        await updateEmailTrackingStatus(trackingId, 'complained');
+        break;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de la création de l\'événement email:', error);
     return false;
   }
 }; 
