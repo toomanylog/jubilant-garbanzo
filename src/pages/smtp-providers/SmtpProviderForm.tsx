@@ -187,6 +187,18 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
   });
   
   // Gestion du formulaire avec Formik
+  const [formInitialized, setFormInitialized] = useState(false);
+  
+  // Utiliser useEffect pour initialiser Formik une seule fois au début, puis reconfigurer lorsque initialValues change
+  useEffect(() => {
+    console.log("⚠️ IMPORTANT - SmtpProviderForm - useEffect pour initialiser formik avec:", initialValues);
+    if (initialValues && !formInitialized) {
+      console.log("⚠️ IMPORTANT - SmtpProviderForm - Initialisation initiale du formulaire");
+      // Marquer le formulaire comme initialisé
+      setFormInitialized(true);
+    }
+  }, [initialValues, formInitialized]);
+
   const formik = useFormik({
     initialValues: initialValues ? {
       ...initialValues,
@@ -199,6 +211,7 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
       priority: initialValues.priority || 1,
       isActive: initialValues.isActive !== false
     } : defaultValues,
+    enableReinitialize: true, // Permettre à Formik de réinitialiser le formulaire quand initialValues change
     validationSchema,
     onSubmit: async (values) => {
       if (!currentUser) return;
@@ -248,6 +261,34 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
     }
   });
 
+  // Placer useEffect après la création de formik pour être sûr qu'il est défini
+  useEffect(() => {
+    if (initialValues && formInitialized) {
+      console.log("⚠️ IMPORTANT - SmtpProviderForm - Données à charger dans le formulaire:", {
+        name: initialValues.name,
+        type: initialValues.providerType,
+        host: initialValues.host
+      });
+      
+      // Réinitialiser explicitement le formulaire avec les valeurs initiales
+      formik.resetForm({
+        values: {
+          ...initialValues,
+          port: initialValues.port || 587,
+          sendingRatePerSecond: initialValues.sendingRatePerSecond || 0,
+          sendingRatePerMinute: initialValues.sendingRatePerMinute || 0,
+          sendingRatePerHour: initialValues.sendingRatePerHour || 0,
+          sendingRatePerDay: initialValues.sendingRatePerDay || 0,
+          dailyQuota: initialValues.dailyQuota || 0,
+          priority: initialValues.priority || 1,
+          isActive: initialValues.isActive !== false
+        }
+      });
+      
+      console.log("⚠️ IMPORTANT - SmtpProviderForm - Formulaire réinitialisé avec valeurs:", formik.values);
+    }
+  }, [initialValues, formInitialized, formik]);
+
   // Vérifie si les champs sont conditionnellement requis
   const isFieldRequired = (field: string): boolean => {
     switch (field) {
@@ -287,25 +328,6 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
       formik.setFieldValue('host', `email-smtp.${region}.amazonaws.com`);
     }
   };
-
-  useEffect(() => {
-    if (initialValues && !formik.dirty) {
-      console.log("⚠️ Initialisation du formulaire avec:", initialValues);
-      formik.resetForm({
-        values: {
-          ...initialValues,
-          port: initialValues.port || 587,
-          sendingRatePerSecond: initialValues.sendingRatePerSecond || 0,
-          sendingRatePerMinute: initialValues.sendingRatePerMinute || 0,
-          sendingRatePerHour: initialValues.sendingRatePerHour || 0,
-          sendingRatePerDay: initialValues.sendingRatePerDay || 0,
-          dailyQuota: initialValues.dailyQuota || 0,
-          priority: initialValues.priority || 1,
-          isActive: initialValues.isActive !== false
-        }
-      });
-    }
-  }, [initialValues, formik]);
 
   return (
     <Layout title={isEditing ? "Modifier un fournisseur SMTP" : "Ajouter un fournisseur SMTP"}>

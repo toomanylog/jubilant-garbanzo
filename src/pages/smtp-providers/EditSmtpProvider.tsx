@@ -140,9 +140,22 @@ const EditSmtpProvider: React.FC = () => {
   const providerClone = JSON.parse(JSON.stringify(provider));
   console.log("⚠️ EditSmtpProvider - Provider cloné:", providerClone);
   
+  // Vérifier si le chemin de rendu est déjà actif
+  console.log("⚠️ EditSmtpProvider - Vérification du cycle de vie du composant");
+  console.log("⚠️ EditSmtpProvider - Sera rendu au prochain cycle:", !!provider && !!providerClone);
+  console.log("⚠️ EditSmtpProvider - Avant rendu, isEditing:", true);
+
+  // Créer une variable intermédiaire pour garantir que les props sont correctement passées
+  const smtpProviderProps = {
+    initialValues: providerClone,
+    isEditing: true
+  };
+  
+  console.log("⚠️ EditSmtpProvider - Props finales:", smtpProviderProps);
+  
   return (
     <Layout title="Modification du fournisseur SMTP">
-      <SmtpProviderForm initialValues={providerClone} isEditing={true} />
+      <SmtpProviderForm {...smtpProviderProps} />
     </Layout>
   );
 };
