@@ -134,7 +134,7 @@ const CampaignDetails: React.FC = () => {
       if (result) {
         toast.success('La campagne a été envoyée avec succès');
         // Recharger les données
-        fetchData();
+        window.location.reload();
       } else {
         toast.error('Échec de l\'envoi de la campagne');
       }
