@@ -9,6 +9,45 @@ import {
 } from '../models/dynamodb';
 import { createSmtpService, EmailOptions } from './smtp-service';
 import { TemplateService } from './template-service';
+import { SmtpProviderService } from './smtp-provider-service';
+import { dynamoDB } from '../models/dynamodb';
+import AWS from 'aws-sdk';
+
+// Initialiser DynamoDB
+const dynamoDB = new AWS.DynamoDB.DocumentClient();
+
+// Type pour les destinataires
+interface Recipient {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  variables?: Record<string, any>;
+}
+
+// Type pour les statistiques de campagne
+interface CampaignStats {
+  delivered: number;
+  failed: number;
+  bounces: number;
+  opened?: number;
+  clicked?: number;
+}
+
+// Type pour les campagnes
+interface Campaign {
+  id: string;
+  name: string;
+  templateId: string;
+  smtpProviderId: string;
+  status: 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed';
+  recipients: Recipient[];
+  scheduledAt?: number;
+  sentAt?: number;
+  createdAt: number;
+  updatedAt: number;
+  errorMessage?: string;
+  stats: CampaignStats;
+}
 
 /**
  * Service pour gérer les campagnes d'emails
@@ -65,165 +104,189 @@ export class CampaignService {
    * @param campaignId ID de la campagne
    * @returns État du lancement de la campagne
    */
-  static async sendCampaign(
-    campaignId: string
-  ): Promise<{ success: boolean; error?: string }> {
+  static async sendCampaign(campaignId: string): Promise<boolean> {
     try {
-      // Récupérer les données de la campagne
-      const campaign = await getEmailCampaignById(campaignId);
+      console.log(`Envoi de la campagne ${campaignId}...`);
       
+      // Récupérer les détails de la campagne
+      const campaign = await this.getCampaign(campaignId);
       if (!campaign) {
-        return {
-          success: false,
-          error: 'Campagne non trouvée'
-        };
+        console.error(`Campagne ${campaignId} non trouvée`);
+        return false;
       }
-      
-      // Vérifier que la campagne est en état brouillon
-      if (campaign.status !== 'draft' && campaign.status !== 'scheduled') {
-        return {
-          success: false,
-          error: `La campagne est déjà en état "${campaign.status}"`
-        };
-      }
-      
-      // Récupérer le template et le fournisseur SMTP
-      const [template, provider] = await Promise.all([
-        getEmailTemplateById(campaign.templateId),
-        getSmtpProviderById(campaign.providerId)
-      ]);
-      
+
+      // Récupérer le template
+      const template = await TemplateService.getTemplate(campaign.templateId);
       if (!template) {
-        return {
-          success: false,
-          error: 'Template non trouvé'
-        };
+        console.error(`Template ${campaign.templateId} non trouvé pour la campagne ${campaignId}`);
+        await this.updateCampaignStatus(campaignId, 'failed', 'Template non trouvé');
+        return false;
       }
-      
-      if (!provider) {
-        return {
-          success: false,
-          error: 'Fournisseur SMTP non trouvé'
-        };
+
+      // Récupérer le fournisseur SMTP
+      const smtpProvider = await SmtpProviderService.getSmtpProvider(campaign.smtpProviderId);
+      if (!smtpProvider) {
+        console.error(`Fournisseur SMTP ${campaign.smtpProviderId} non trouvé pour la campagne ${campaignId}`);
+        await this.updateCampaignStatus(campaignId, 'failed', 'Fournisseur SMTP non trouvé');
+        return false;
       }
-      
-      // Mise à jour du statut de la campagne
-      const updatedCampaign = {
-        ...campaign,
-        status: 'sending' as const,
-        updatedAt: new Date().toISOString()
-      };
-      await updateEmailCampaign(updatedCampaign);
-      
-      // Obtention du service SMTP approprié
-      const smtpService = createSmtpService(provider);
-      
-      // Statistiques pour le suivi
-      let sent = 0;
-      let delivered = 0;
-      let failed = 0;
-      
-      // Traitement de chaque destinataire
-      for (const recipient of campaign.recipients) {
-        try {
-          // Préparer les variables (dans cet exemple, nous utilisons juste l'email comme variable)
-          const variables = {
-            email: recipient,
-            // Les variables standard
-            unsubscribe_link: `https://example.com/unsubscribe?email=${encodeURIComponent(recipient)}`,
-            view_in_browser: `https://example.com/view?campaign=${campaign.campaignId}&email=${encodeURIComponent(recipient)}`,
-            date: new Date().toLocaleDateString()
-          };
-          
-          // Préparer le contenu du mail avec les variables
-          const { html, text, subject } = TemplateService.prepareTemplate(template, variables);
-          
-          // Options d'envoi d'email
-          const emailOptions: EmailOptions = {
-            to: [recipient],
-            subject,
-            html,
-            text,
-            from: {
-              email: campaign.fromEmail,
-              name: campaign.fromName
-            }
-          };
-          
-          // Envoi de l'email
-          const result = await smtpService.sendEmail(emailOptions);
-          
-          if (result.success) {
-            sent++;
-            delivered++;
-          } else {
-            failed++;
-            console.error(`Échec d'envoi à ${recipient}:`, result.error);
-          }
-        } catch (recipientError) {
-          failed++;
-          console.error(`Erreur lors de l'envoi à ${recipient}:`, recipientError);
-        }
+
+      // Créer le service SMTP
+      const smtpService = createSmtpService(smtpProvider);
+
+      // Mise à jour du statut
+      await this.updateCampaignStatus(campaignId, 'sending');
+
+      let successCount = 0;
+      let failureCount = 0;
+      let bounceCount = 0;
+
+      // Récupérer la liste des destinataires
+      const recipients = campaign.recipients || [];
+      const totalRecipients = recipients.length;
+
+      // Traitement par lots pour éviter de surcharger le serveur SMTP
+      const batchSize = 50;
+      for (let i = 0; i < recipients.length; i += batchSize) {
+        const batch = recipients.slice(i, i + batchSize);
         
-        // Mise à jour des statistiques après chaque lot de 10 envois
-        if ((sent + failed) % 10 === 0 || (sent + failed) === campaign.recipients.length) {
-          const statsUpdate = {
-            ...campaign,
-            stats: {
-              ...campaign.stats,
-              sent,
-              delivered
-            },
-            updatedAt: new Date().toISOString()
-          };
-          await updateEmailCampaign(statsUpdate);
+        // Traitement parallèle des destinataires dans le lot actuel
+        const sendPromises = batch.map(async (recipient: Recipient) => {
+          try {
+            // Personnalisation du contenu HTML
+            const personalizedHtml = this.personalizeContent(template.html, {
+              firstName: recipient.firstName || '',
+              lastName: recipient.lastName || '',
+              email: recipient.email,
+              ...recipient.variables
+            });
+            
+            // Personnalisation du sujet
+            const personalizedSubject = this.personalizeContent(template.subject, {
+              firstName: recipient.firstName || '',
+              lastName: recipient.lastName || '',
+              email: recipient.email,
+              ...recipient.variables
+            });
+
+            // Envoi de l'email
+            const result = await smtpService.sendEmail({
+              to: recipient.email,
+              from: `${template.senderName} <${template.senderEmail}>`,
+              subject: personalizedSubject,
+              html: personalizedHtml,
+              text: this.htmlToText(personalizedHtml),
+              replyTo: template.replyToEmail || template.senderEmail,
+              variables: recipient.variables
+            });
+
+            // Mise à jour des statistiques
+            if (result.success) {
+              successCount++;
+              
+              // Enregistrer le suivi de l'email envoyé
+              await this.trackEmailSent(campaignId, recipient.email, result.messageId);
+            } else if (result.error?.includes('bounce')) {
+              bounceCount++;
+              failureCount++;
+            } else {
+              failureCount++;
+            }
+
+            // Mise à jour périodique des statistiques
+            if ((successCount + failureCount) % 25 === 0 || (successCount + failureCount) === totalRecipients) {
+              await this.updateCampaignStats(campaignId, {
+                delivered: successCount,
+                failed: failureCount,
+                bounces: bounceCount
+              });
+            }
+
+            return result;
+          } catch (error: any) {
+            console.error(`Erreur lors de l'envoi à ${recipient.email}:`, error);
+            failureCount++;
+            return { success: false, error: error.message };
+          }
+        });
+
+        // Attendre que tous les emails du lot soient traités
+        await Promise.all(sendPromises);
+        
+        // Petite pause entre les lots pour éviter les limitations des fournisseurs SMTP
+        if (i + batchSize < recipients.length) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
-      
+
       // Mise à jour finale du statut de la campagne
-      const status = failed === campaign.recipients.length ? 'failed' : 'sent';
-      const finalUpdate = {
-        ...campaign,
-        status: status as 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed',
-        sentAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        stats: {
-          ...campaign.stats,
-          total: campaign.recipients.length,
-          sent,
-          delivered,
-          opened: 0,  // Ces valeurs seront mises à jour au fur et à mesure
-          clicked: 0,
-          bounced: failed,
-          complaints: 0
-        }
-      };
-      await updateEmailCampaign(finalUpdate);
-      
-      return {
-        success: sent > 0,
-        error: failed > 0 ? `Échec de l'envoi à ${failed} destinataire(s)` : undefined
-      };
-    } catch (error: any) {
-      // En cas d'erreur générale, marquer la campagne comme échouée
-      try {
-        const campaign = await getEmailCampaignById(campaignId);
-        if (campaign) {
-          const failedUpdate = {
-            ...campaign,
-            status: 'failed' as const,
-            updatedAt: new Date().toISOString()
-          };
-          await updateEmailCampaign(failedUpdate);
-        }
-      } catch (updateError) {
-        console.error('Erreur lors de la mise à jour du statut d\'échec:', updateError);
+      if (failureCount === totalRecipients) {
+        await this.updateCampaignStatus(campaignId, 'failed', 'Tous les envois ont échoué');
+      } else if (successCount > 0) {
+        await this.updateCampaignStatus(campaignId, 'completed');
+      } else {
+        await this.updateCampaignStatus(campaignId, 'failed', 'Aucun email envoyé avec succès');
       }
-      
-      return {
-        success: false,
-        error: error.message || 'Une erreur est survenue lors de l\'envoi de la campagne'
-      };
+
+      return successCount > 0;
+    } catch (error: any) {
+      console.error(`Erreur lors de l'envoi de la campagne ${campaignId}:`, error);
+      await this.updateCampaignStatus(campaignId, 'failed', error.message);
+      return false;
+    }
+  }
+
+  // Convertit HTML en texte pour les lecteurs de mails qui ne supportent pas le HTML
+  private static htmlToText(html: string): string {
+    // Version simple: supprimer les balises HTML et convertir les entités HTML basiques
+    return html
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .trim();
+  }
+
+  // Personnalise le contenu avec les variables de l'utilisateur
+  private static personalizeContent(content: string, variables: Record<string, any>): string {
+    let result = content;
+    
+    // Remplacer les variables dans le format {{variable}}
+    Object.entries(variables).forEach(([key, value]) => {
+      const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+      result = result.replace(regex, String(value || ''));
+    });
+    
+    // Supprimer les variables non remplacées
+    result = result.replace(/{{(\s*[\w\.]+\s*)}}/g, '');
+    
+    return result;
+  }
+
+  // Enregistre le suivi d'un email envoyé
+  private static async trackEmailSent(campaignId: string, recipientEmail: string, messageId?: string): Promise<void> {
+    try {
+      await dynamoDB.put({
+        TableName: 'EmailTracking',
+        Item: {
+          id: `${campaignId}:${recipientEmail}`,
+          campaignId,
+          recipientEmail,
+          messageId: messageId || `msg-${Date.now()}`,
+          sentTimestamp: Date.now(),
+          status: 'sent',
+          openedTimestamp: null,
+          clickedTimestamp: null,
+          clickedLinks: []
+        }
+      }).promise();
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement du suivi:', error);
     }
   }
 
@@ -447,6 +510,108 @@ export class CampaignService {
     } catch (error) {
       console.error("Erreur lors du calcul du nombre de campagnes actives:", error);
       return 0;
+    }
+  }
+
+  /**
+   * Récupère une campagne par son ID
+   */
+  static async getCampaign(campaignId: string): Promise<Campaign | null> {
+    try {
+      const result = await dynamoDB.get({
+        TableName: 'Campaigns',
+        Key: { id: campaignId }
+      }).promise();
+      
+      return (result.Item as Campaign) || null;
+    } catch (error) {
+      console.error(`Erreur lors de la récupération de la campagne ${campaignId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Met à jour le statut d'une campagne
+   */
+  static async updateCampaignStatus(
+    campaignId: string, 
+    status: 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed', 
+    errorMessage?: string
+  ): Promise<boolean> {
+    try {
+      const campaign = await this.getCampaign(campaignId);
+      if (!campaign) return false;
+      
+      const updateParams: AWS.DynamoDB.DocumentClient.UpdateItemInput = {
+        TableName: 'Campaigns',
+        Key: { id: campaignId },
+        UpdateExpression: 'SET #status = :status, updatedAt = :updatedAt',
+        ExpressionAttributeNames: {
+          '#status': 'status'
+        },
+        ExpressionAttributeValues: {
+          ':status': status,
+          ':updatedAt': Date.now()
+        },
+        ReturnValues: 'UPDATED_NEW'
+      };
+      
+      // Ajouter le message d'erreur si fourni
+      if (errorMessage) {
+        updateParams.UpdateExpression += ', errorMessage = :errorMessage';
+        updateParams.ExpressionAttributeValues[':errorMessage'] = errorMessage;
+      }
+      
+      // Ajouter la date d'envoi si le statut est 'completed'
+      if (status === 'completed') {
+        updateParams.UpdateExpression += ', sentAt = :sentAt';
+        updateParams.ExpressionAttributeValues[':sentAt'] = Date.now();
+      }
+      
+      await dynamoDB.update(updateParams).promise();
+      return true;
+    } catch (error) {
+      console.error(`Erreur lors de la mise à jour du statut de la campagne ${campaignId}:`, error);
+      return false;
+    }
+  }
+  
+  /**
+   * Met à jour les statistiques d'une campagne
+   */
+  static async updateCampaignStats(
+    campaignId: string, 
+    stats: Partial<CampaignStats>
+  ): Promise<boolean> {
+    try {
+      const updateParams: AWS.DynamoDB.DocumentClient.UpdateItemInput = {
+        TableName: 'Campaigns',
+        Key: { id: campaignId },
+        UpdateExpression: 'SET updatedAt = :updatedAt',
+        ExpressionAttributeValues: {
+          ':updatedAt': Date.now()
+        },
+        ReturnValues: 'UPDATED_NEW'
+      };
+      
+      // Construire l'expression de mise à jour pour les statistiques
+      const statsAttributes: string[] = [];
+      Object.entries(stats).forEach(([key, value]) => {
+        if (value !== undefined) {
+          statsAttributes.push(`stats.${key} = :${key}`);
+          updateParams.ExpressionAttributeValues[`:${key}`] = value;
+        }
+      });
+      
+      if (statsAttributes.length > 0) {
+        updateParams.UpdateExpression += ', ' + statsAttributes.join(', ');
+      }
+      
+      await dynamoDB.update(updateParams).promise();
+      return true;
+    } catch (error) {
+      console.error(`Erreur lors de la mise à jour des statistiques de la campagne ${campaignId}:`, error);
+      return false;
     }
   }
 } 

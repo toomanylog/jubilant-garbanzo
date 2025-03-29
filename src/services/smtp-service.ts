@@ -231,21 +231,42 @@ export class MailjetService extends SmtpService {
 export class CustomSmtpService extends SmtpService {
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      // Note: Dans un environnement réel, nous utiliserions nodemailer ou un autre service
-      // pour envoyer des emails via SMTP, ce qui nécessiterait un backend.
-      // Ici, nous simulons juste l'envoi.
-      console.log('Envoi d\'email via SMTP personnalisé:', {
-        host: this.provider.host,
-        port: this.provider.port,
-        username: this.provider.username,
-        to: options.to,
-        from: options.from,
-        subject: options.subject
+      // Envoi de la demande au backend
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          providerType: 'custom_smtp',
+          smtpConfig: {
+            host: this.provider.host,
+            port: this.provider.port,
+            username: this.provider.username,
+            password: this.provider.password,
+            requireTls: this.provider.requiresTls
+          },
+          emailOptions: {
+            to: options.to,
+            from: options.from,
+            subject: options.subject,
+            html: options.html,
+            text: options.text,
+            replyTo: options.replyTo,
+            attachments: options.attachments
+          }
+        })
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erreur lors de l\'envoi d\'email');
+      }
+
+      const result = await response.json();
       return {
         success: true,
-        messageId: `custom-smtp-${Date.now()}`
+        messageId: result.messageId || `custom-smtp-${Date.now()}`
       };
     } catch (error: any) {
       console.error('Erreur lors de l\'envoi d\'email via SMTP personnalisé:', error);
@@ -257,25 +278,49 @@ export class CustomSmtpService extends SmtpService {
   }
 }
 
-// Service pour Office365
+// Service Office 365
 export class Office365Service extends SmtpService {
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      // Note: Dans un environnement réel, nous utiliserions Microsoft Graph API
-      // Ici, nous simulons juste l'envoi.
-      console.log('Envoi d\'email via Office365:', {
-        username: this.provider.username,
-        to: options.to,
-        from: options.from,
-        subject: options.subject
+      // Envoi de la demande au backend
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          providerType: 'office365',
+          smtpConfig: {
+            host: this.provider.host || 'smtp.office365.com',
+            port: this.provider.port || 587,
+            username: this.provider.username,
+            password: this.provider.password,
+            requireTls: true
+          },
+          emailOptions: {
+            to: options.to,
+            from: options.from,
+            subject: options.subject,
+            html: options.html,
+            text: options.text,
+            replyTo: options.replyTo,
+            attachments: options.attachments
+          }
+        })
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erreur lors de l\'envoi d\'email');
+      }
+
+      const result = await response.json();
       return {
         success: true,
-        messageId: `office365-${Date.now()}`
+        messageId: result.messageId || `office365-${Date.now()}`
       };
     } catch (error: any) {
-      console.error('Erreur lors de l\'envoi d\'email via Office365:', error);
+      console.error('Erreur lors de l\'envoi d\'email via Office 365:', error);
       return {
         success: false,
         error: error.message
