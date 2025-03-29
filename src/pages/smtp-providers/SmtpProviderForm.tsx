@@ -77,7 +77,7 @@ interface SmtpProviderWithWebhooks extends SmtpProvider {
 }
 
 // Type pour les valeurs du formulaire qui inclut webhookSettings
-interface FormValues extends SmtpProviderWithWebhooks {
+interface FormValues extends Omit<SmtpProviderWithWebhooks, 'port'> {
   port: string | number;
 }
 
@@ -117,6 +117,19 @@ const AWS_REGIONS = [
 interface SmtpProviderFormProps {
   initialValues?: SmtpProviderWithWebhooks;
   isEditing?: boolean;
+}
+
+// Ajouter une fonction utilitaire pour vérifier la structure de webhookSettings
+const isWebhookSettings = (obj: any): obj is {
+  enabled: boolean;
+  bounceUrl?: string;
+  deliveryUrl?: string;
+  openUrl?: string;
+  clickUrl?: string;
+  complaintUrl?: string;
+  useDefaultWebhooks?: boolean;
+} => {
+  return obj && typeof obj === 'object' && 'enabled' in obj;
 }
 
 const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({ 
@@ -915,7 +928,7 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
                 </FormHelperText>
               </FormGroup>
 
-              {!formik.values.webhookSettings?.useDefaultWebhooks && (
+              {!formik.values.webhookSettings?.useDefaultWebhooks && isWebhookSettings(formik.values.webhookSettings) && (
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="subtitle2" gutterBottom>
                     URLs des Webhooks Personnalisés
@@ -927,11 +940,17 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
                     label="URL de notification de rebond (bounce)"
                     variant="outlined"
                     margin="normal"
-                    value={formik.values.webhookSettings?.bounceUrl || ''}
+                    value={formik.values.webhookSettings.bounceUrl || ''}
                     onChange={formik.handleChange}
-                    error={Boolean(formik.touched.webhookSettings?.bounceUrl && formik.errors.webhookSettings?.bounceUrl)}
+                    error={Boolean(isWebhookSettings(formik.touched.webhookSettings) && 
+                           formik.touched.webhookSettings.bounceUrl && 
+                           isWebhookSettings(formik.errors.webhookSettings) && 
+                           formik.errors.webhookSettings.bounceUrl)}
                     helperText={
-                      (formik.touched.webhookSettings?.bounceUrl && formik.errors.webhookSettings?.bounceUrl) || 
+                      (isWebhookSettings(formik.touched.webhookSettings) && 
+                       formik.touched.webhookSettings.bounceUrl && 
+                       isWebhookSettings(formik.errors.webhookSettings) && 
+                       formik.errors.webhookSettings.bounceUrl) || 
                       "URL qui sera appelée lorsqu'un email rebondit"
                     }
                   />
@@ -942,11 +961,17 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
                     label="URL de confirmation de livraison"
                     variant="outlined"
                     margin="normal"
-                    value={formik.values.webhookSettings?.deliveryUrl || ''}
+                    value={formik.values.webhookSettings.deliveryUrl || ''}
                     onChange={formik.handleChange}
-                    error={Boolean(formik.touched.webhookSettings?.deliveryUrl && formik.errors.webhookSettings?.deliveryUrl)}
+                    error={Boolean(isWebhookSettings(formik.touched.webhookSettings) && 
+                           formik.touched.webhookSettings.deliveryUrl && 
+                           isWebhookSettings(formik.errors.webhookSettings) && 
+                           formik.errors.webhookSettings.deliveryUrl)}
                     helperText={
-                      (formik.touched.webhookSettings?.deliveryUrl && formik.errors.webhookSettings?.deliveryUrl) || 
+                      (isWebhookSettings(formik.touched.webhookSettings) && 
+                       formik.touched.webhookSettings.deliveryUrl && 
+                       isWebhookSettings(formik.errors.webhookSettings) && 
+                       formik.errors.webhookSettings.deliveryUrl) || 
                       "URL qui sera appelée lorsqu'un email est livré"
                     }
                   />
@@ -957,11 +982,17 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
                     label="URL de notification d'ouverture"
                     variant="outlined"
                     margin="normal"
-                    value={formik.values.webhookSettings?.openUrl || ''}
+                    value={formik.values.webhookSettings.openUrl || ''}
                     onChange={formik.handleChange}
-                    error={Boolean(formik.touched.webhookSettings?.openUrl && formik.errors.webhookSettings?.openUrl)}
+                    error={Boolean(isWebhookSettings(formik.touched.webhookSettings) && 
+                           formik.touched.webhookSettings.openUrl && 
+                           isWebhookSettings(formik.errors.webhookSettings) && 
+                           formik.errors.webhookSettings.openUrl)}
                     helperText={
-                      (formik.touched.webhookSettings?.openUrl && formik.errors.webhookSettings?.openUrl) || 
+                      (isWebhookSettings(formik.touched.webhookSettings) && 
+                       formik.touched.webhookSettings.openUrl && 
+                       isWebhookSettings(formik.errors.webhookSettings) && 
+                       formik.errors.webhookSettings.openUrl) || 
                       "URL qui sera appelée lorsqu'un email est ouvert"
                     }
                   />
@@ -972,11 +1003,17 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
                     label="URL de notification de clic"
                     variant="outlined"
                     margin="normal"
-                    value={formik.values.webhookSettings?.clickUrl || ''}
+                    value={formik.values.webhookSettings.clickUrl || ''}
                     onChange={formik.handleChange}
-                    error={Boolean(formik.touched.webhookSettings?.clickUrl && formik.errors.webhookSettings?.clickUrl)}
+                    error={Boolean(isWebhookSettings(formik.touched.webhookSettings) && 
+                           formik.touched.webhookSettings.clickUrl && 
+                           isWebhookSettings(formik.errors.webhookSettings) && 
+                           formik.errors.webhookSettings.clickUrl)}
                     helperText={
-                      (formik.touched.webhookSettings?.clickUrl && formik.errors.webhookSettings?.clickUrl) || 
+                      (isWebhookSettings(formik.touched.webhookSettings) && 
+                       formik.touched.webhookSettings.clickUrl && 
+                       isWebhookSettings(formik.errors.webhookSettings) && 
+                       formik.errors.webhookSettings.clickUrl) || 
                       "URL qui sera appelée lorsqu'un lien est cliqué"
                     }
                   />
@@ -987,11 +1024,17 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
                     label="URL de notification de plainte"
                     variant="outlined"
                     margin="normal"
-                    value={formik.values.webhookSettings?.complaintUrl || ''}
+                    value={formik.values.webhookSettings.complaintUrl || ''}
                     onChange={formik.handleChange}
-                    error={Boolean(formik.touched.webhookSettings?.complaintUrl && formik.errors.webhookSettings?.complaintUrl)}
+                    error={Boolean(isWebhookSettings(formik.touched.webhookSettings) && 
+                           formik.touched.webhookSettings.complaintUrl && 
+                           isWebhookSettings(formik.errors.webhookSettings) && 
+                           formik.errors.webhookSettings.complaintUrl)}
                     helperText={
-                      (formik.touched.webhookSettings?.complaintUrl && formik.errors.webhookSettings?.complaintUrl) || 
+                      (isWebhookSettings(formik.touched.webhookSettings) && 
+                       formik.touched.webhookSettings.complaintUrl && 
+                       isWebhookSettings(formik.errors.webhookSettings) && 
+                       formik.errors.webhookSettings.complaintUrl) || 
                       "URL qui sera appelée lorsqu'un email est marqué comme spam"
                     }
                   />
