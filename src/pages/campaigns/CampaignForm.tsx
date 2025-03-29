@@ -310,6 +310,48 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
     }
   };
 
+  // Ajouter cet useEffect après la définition de formik
+  useEffect(() => {
+    if (initialValues && !formik.dirty) {
+      console.log("⚠️ Initialisation du formulaire de campagne avec:", initialValues);
+      
+      // Convertir les tableaux en chaînes pour les afficher dans les champs multilignes
+      const subjectValue = Array.isArray(initialValues.subject) 
+        ? initialValues.subject.join('\n') 
+        : initialValues.subject || '';
+        
+      const fromNameValue = Array.isArray(initialValues.fromName)
+        ? initialValues.fromName.join('\n')
+        : initialValues.fromName || '';
+        
+      const fromEmailValue = Array.isArray(initialValues.fromEmail)
+        ? initialValues.fromEmail.join('\n')
+        : initialValues.fromEmail || '';
+      
+      const recipientsValue = Array.isArray(initialValues.recipients)
+        ? initialValues.recipients.join('\n')
+        : '';
+      
+      // Ajoutez tous les champs requis, y compris content
+      formik.setValues({
+        name: initialValues.name || '',
+        templateId: initialValues.templateId || '',
+        smtpProviderId: initialValues.smtpProviderId || '',
+        subject: subjectValue,
+        fromName: fromNameValue,
+        fromEmail: fromEmailValue,
+        recipients: recipientsValue,
+        content: initialValues.content || '',
+        rotationOptions: initialValues.rotationOptions || {
+          templateRotation: 'sequential',
+          smtpRotation: 'sequential',
+          subjectRotation: 'sequential',
+          senderRotation: 'sequential'
+        }
+      });
+    }
+  }, [initialValues, formik]);
+
   // Afficher un spinner pendant le chargement
   if (isLoading) {
     return (
@@ -533,112 +575,53 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
                 titleTypographyProps={{ variant: 'subtitle1', className: 'font-semibold' }}
               />
               <CardContent className="p-6">
-                <Autocomplete
+                <TextField
+                  fullWidth
                   id="subject"
-                  options={[]}
-                  value={Array.isArray(formik.values.subject) ? formik.values.subject : [formik.values.subject]}
-                  onChange={(event, newValue) => {
-                    if (newValue) {
-                      if (Array.isArray(newValue)) {
-                        formik.setFieldValue('subject', newValue);
-                      } else {
-                        formik.setFieldValue('subject', newValue);
-                      }
-                    } else {
-                      formik.setFieldValue('subject', '');
-                    }
-                  }}
-                  multiple
-                  renderTags={(selected, getTagProps) =>
-                    selected.map((option, index) => (
-                      <Chip
-                        variant="outlined"
-                        label={option}
-                        {...getTagProps({ index })}
-                        key={option}
-                      />
-                    ))
-                  }
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Sujets"
-                      error={formik.touched.subject && Boolean(formik.errors.subject)}
-                      helperText={formik.touched.subject && formik.errors.subject}
-                    />
-                  )}
+                  name="subject"
+                  label="Objet de l'email"
+                  variant="outlined"
+                  margin="normal"
+                  value={typeof formik.values.subject === 'string' ? formik.values.subject : ''}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  error={formik.touched.subject && Boolean(formik.errors.subject)}
+                  helperText={formik.touched.subject && formik.errors.subject}
+                  className="mb-4"
+                  required
                 />
                 
-                <Autocomplete
+                <TextField
+                  fullWidth
                   id="fromName"
-                  options={[]}
-                  value={Array.isArray(formik.values.fromName) ? formik.values.fromName : [formik.values.fromName]}
-                  onChange={(event, newValue) => {
-                    if (newValue) {
-                      if (Array.isArray(newValue)) {
-                        formik.setFieldValue('fromName', newValue);
-                      } else {
-                        formik.setFieldValue('fromName', newValue);
-                      }
-                    } else {
-                      formik.setFieldValue('fromName', '');
-                    }
-                  }}
-                  multiple
-                  renderTags={(selected, getTagProps) =>
-                    selected.map((option, index) => (
-                      <Chip
-                        variant="outlined"
-                        label={option}
-                        {...getTagProps({ index })}
-                        key={option}
-                      />
-                    ))
-                  }
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Noms d'expéditeur"
-                      error={formik.touched.fromName && Boolean(formik.errors.fromName)}
-                      helperText={formik.touched.fromName && formik.errors.fromName}
-                    />
-                  )}
+                  name="fromName"
+                  label="Nom de l'expéditeur"
+                  variant="outlined"
+                  margin="normal"
+                  value={typeof formik.values.fromName === 'string' ? formik.values.fromName : ''}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  error={formik.touched.fromName && Boolean(formik.errors.fromName)}
+                  helperText={formik.touched.fromName && formik.errors.fromName}
+                  className="mb-4"
+                  required
                 />
                 
-                <Autocomplete
+                <TextField
+                  fullWidth
                   id="fromEmail"
-                  options={[]}
-                  value={Array.isArray(formik.values.fromEmail) ? formik.values.fromEmail : [formik.values.fromEmail]}
-                  onChange={(event, newValue) => {
-                    if (newValue) {
-                      if (Array.isArray(newValue)) {
-                        formik.setFieldValue('fromEmail', newValue);
-                      } else {
-                        formik.setFieldValue('fromEmail', newValue);
-                      }
-                    } else {
-                      formik.setFieldValue('fromEmail', '');
-                    }
-                  }}
-                  multiple
-                  renderTags={(selected, getTagProps) =>
-                    selected.map((option, index) => (
-                      <Chip
-                        variant="outlined"
-                        label={option}
-                        {...getTagProps({ index })}
-                        key={option}
-                      />
-                    ))
-                  }
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Emails d'expéditeur"
-                      error={formik.touched.fromEmail && Boolean(formik.errors.fromEmail)}
-                      helperText={formik.touched.fromEmail && formik.errors.fromEmail}
-                    />
-                  )}
+                  name="fromEmail"
+                  label="Email de l'expéditeur"
+                  variant="outlined"
+                  margin="normal"
+                  type="email"
+                  value={typeof formik.values.fromEmail === 'string' ? formik.values.fromEmail : ''}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  error={formik.touched.fromEmail && Boolean(formik.errors.fromEmail)}
+                  helperText={formik.touched.fromEmail && formik.errors.fromEmail}
+                  className="mb-4"
+                  required
                 />
                 
                 <Box className="mt-6 mb-4">

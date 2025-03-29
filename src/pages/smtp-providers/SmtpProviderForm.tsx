@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -174,13 +174,14 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
   const formik = useFormik({
     initialValues: initialValues ? {
       ...initialValues,
-      port: initialValues.port?.toString() || defaultValues.port,
-      sendingRatePerSecond: initialValues.sendingRatePerSecond || defaultValues.sendingRatePerSecond,
-      sendingRatePerMinute: initialValues.sendingRatePerMinute || defaultValues.sendingRatePerMinute,
-      sendingRatePerHour: initialValues.sendingRatePerHour || defaultValues.sendingRatePerHour,
-      sendingRatePerDay: initialValues.sendingRatePerDay || defaultValues.sendingRatePerDay,
-      dailyQuota: initialValues.dailyQuota || defaultValues.dailyQuota,
-      priority: initialValues.priority || defaultValues.priority
+      port: initialValues.port || 587,
+      sendingRatePerSecond: initialValues.sendingRatePerSecond || 0,
+      sendingRatePerMinute: initialValues.sendingRatePerMinute || 0,
+      sendingRatePerHour: initialValues.sendingRatePerHour || 0,
+      sendingRatePerDay: initialValues.sendingRatePerDay || 0,
+      dailyQuota: initialValues.dailyQuota || 0,
+      priority: initialValues.priority || 1,
+      isActive: initialValues.isActive !== false
     } : defaultValues,
     validationSchema,
     onSubmit: async (values) => {
@@ -270,6 +271,25 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
       formik.setFieldValue('host', `email-smtp.${region}.amazonaws.com`);
     }
   };
+
+  useEffect(() => {
+    if (initialValues && !formik.dirty) {
+      console.log("⚠️ Initialisation du formulaire avec:", initialValues);
+      formik.resetForm({
+        values: {
+          ...initialValues,
+          port: initialValues.port || 587,
+          sendingRatePerSecond: initialValues.sendingRatePerSecond || 0,
+          sendingRatePerMinute: initialValues.sendingRatePerMinute || 0,
+          sendingRatePerHour: initialValues.sendingRatePerHour || 0,
+          sendingRatePerDay: initialValues.sendingRatePerDay || 0,
+          dailyQuota: initialValues.dailyQuota || 0,
+          priority: initialValues.priority || 1,
+          isActive: initialValues.isActive !== false
+        }
+      });
+    }
+  }, [initialValues, formik]);
 
   return (
     <Layout title={isEditing ? "Modifier un fournisseur SMTP" : "Ajouter un fournisseur SMTP"}>
