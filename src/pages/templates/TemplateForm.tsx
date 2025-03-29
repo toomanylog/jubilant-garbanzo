@@ -54,78 +54,15 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   const [isLoading, setIsLoading] = useState(!!templateId);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
-  const [templateData, setTemplateData] = useState<EmailTemplate | null>(initialValues || null);
+  const [templateData, setTemplateData] = useState<EmailTemplate | null>(null);
 
-  // Valeurs par défaut du formulaire
+  // Valeurs initiales du formulaire
   const defaultValues = {
     name: '',
     subject: '',
-    fromName: '',
-    fromEmail: '',
-    htmlContent: `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Email Template</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-      background-color: #ffffff;
-    }
-    .header {
-      text-align: center;
-      padding: 20px 0;
-      border-bottom: 1px solid #eee;
-    }
-    .content {
-      padding: 20px 0;
-    }
-    .footer {
-      text-align: center;
-      padding: 20px 0;
-      font-size: 12px;
-      color: #999;
-      border-top: 1px solid #eee;
-    }
-    .button {
-      display: inline-block;
-      padding: 10px 20px;
-      background-color: #0066cc;
-      color: #ffffff;
-      text-decoration: none;
-      border-radius: 5px;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>North Eyes</h1>
-    </div>
-    <div class="content">
-      <h2>Bonjour {{name}},</h2>
-      <p>Voici votre email personnalisé.</p>
-      <p>Sentez-vous libre de modifier ce modèle selon vos besoins.</p>
-      <p><a href="#" class="button">Appel à l'action</a></p>
-    </div>
-    <div class="footer">
-      <p>© 2023 North Eyes. Tous droits réservés.</p>
-      <p><a href="{{unsubscribe_link}}">Se désabonner</a></p>
-    </div>
-  </div>
-</body>
-</html>`,
-    textContent: ''
+    htmlContent: '',
+    textContent: '',
+    variables: [] as string[]
   };
 
   // Chargement du template si nous sommes en mode édition
@@ -177,10 +114,9 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
           values: {
             name: template.name || '',
             subject: template.subject || '',
-            fromName: template.fromName || '',
-            fromEmail: template.fromEmail || '',
             htmlContent: template.htmlContent || '',
-            textContent: template.textContent || ''
+            textContent: template.textContent || '',
+            variables: template.variables || []
           }
         });
       } catch (err: any) {
@@ -198,8 +134,6 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   const validationSchema = Yup.object().shape({
     name: Yup.string().required('Le nom est requis'),
     subject: Yup.string().required('Le sujet est requis'),
-    fromName: Yup.string().required('Le nom de l\'expéditeur est requis'),
-    fromEmail: Yup.string().email('Email invalide').required('L\'email de l\'expéditeur est requis'),
     htmlContent: Yup.string().required('Le contenu HTML est requis')
   });
 
@@ -228,10 +162,9 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
         const newTemplateData: EmailTemplate = {
           name: values.name,
           subject: values.subject,
-          fromName: values.fromName,
-          fromEmail: values.fromEmail,
           htmlContent: values.htmlContent || '<p>Contenu par défaut</p>', // S'assurer qu'il y a toujours du contenu
           textContent: values.textContent || '',
+          variables: values.variables || [],
           userId: currentUser.userId,
           templateId: templateData?.templateId || templateId || uuidv4(),
           createdAt: templateData?.createdAt || new Date().toISOString(),
@@ -351,37 +284,6 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                   required
                   variant="outlined"
                   className="rounded-md mb-4"
-                />
-                
-                <TextField
-                  fullWidth
-                  id="fromName"
-                  name="fromName"
-                  label="Nom de l'expéditeur"
-                  value={formik.values.fromName}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={formik.touched.fromName && Boolean(formik.errors.fromName)}
-                  helperText={formik.touched.fromName && formik.errors.fromName}
-                  required
-                  variant="outlined"
-                  className="rounded-md mb-4"
-                />
-                
-                <TextField
-                  fullWidth
-                  id="fromEmail"
-                  name="fromEmail"
-                  label="Email de l'expéditeur"
-                  value={formik.values.fromEmail}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={formik.touched.fromEmail && Boolean(formik.errors.fromEmail)}
-                  helperText={formik.touched.fromEmail && formik.errors.fromEmail}
-                  required
-                  variant="outlined"
-                  className="rounded-md"
-                  type="email"
                 />
               </Box>
             </CardContent>

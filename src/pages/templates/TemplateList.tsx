@@ -159,10 +159,9 @@ const TemplateList: React.FC = () => {
               <Table>
                 <TableHead className="bg-gray-50 dark:bg-gray-800">
                   <TableRow>
-                    <TableCell className="font-semibold text-gray-900 dark:text-white">Nom</TableCell>
-                    <TableCell className="font-semibold text-gray-900 dark:text-white">Objet</TableCell>
-                    <TableCell className="font-semibold text-gray-900 dark:text-white">Expéditeur</TableCell>
-                    <TableCell className="font-semibold text-gray-900 dark:text-white">Date de création</TableCell>
+                    <TableCell className="font-semibold text-gray-900 dark:text-white">Nom / Sujet</TableCell>
+                    <TableCell className="font-semibold text-gray-900 dark:text-white">Dernière mise à jour</TableCell>
+                    <TableCell className="font-semibold text-gray-900 dark:text-white">Variables</TableCell>
                     <TableCell className="font-semibold text-gray-900 dark:text-white">Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -175,25 +174,23 @@ const TemplateList: React.FC = () => {
                       onClick={() => handlePreview(template.templateId)}
                     >
                       <TableCell className="font-medium text-gray-900 dark:text-white">
-                        {template.name}
+                        <Box className="flex flex-col justify-center">
+                          <Typography variant="subtitle1" className="font-semibold mb-1">
+                            {template.name}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {template.subject}
+                          </Typography>
+                        </Box>
                       </TableCell>
                       <TableCell className="text-gray-700 dark:text-gray-300">
-                        {template.subject}
+                        {new Date(template.updatedAt).toLocaleDateString()} 
+                        {new Date(template.updatedAt).toLocaleTimeString()}
                       </TableCell>
                       <TableCell className="text-gray-700 dark:text-gray-300">
-                        <span className="flex items-center">
-                          <span className="font-medium">{template.fromName}</span>
-                          <span className="mx-1 text-gray-500">&lt;</span>
-                          <span className="text-primary">{template.fromEmail}</span>
-                          <span className="text-gray-500">&gt;</span>
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-gray-700 dark:text-gray-300">
-                        {new Date(template.createdAt).toLocaleDateString('fr-FR', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric'
-                        })}
+                        {template.variables && template.variables.length > 0 
+                          ? template.variables.join(', ') 
+                          : 'Aucune'}
                       </TableCell>
                       <TableCell className="space-x-1" onClick={(e) => e.stopPropagation()}>
                         <Tooltip title="Prévisualiser">

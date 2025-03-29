@@ -234,13 +234,13 @@ export class CampaignService {
             const result = await smtpService.sendEmail({
               to: recipient.email,
               from: {
-                email: campaign.fromEmail || template.fromEmail || 'noreply@example.com',
-                name: campaign.fromName || template.fromName || 'North Eyes'
+                email: campaign.fromEmail || 'noreply@example.com',
+                name: campaign.fromName || 'North Eyes'
               },
               subject: personalizedSubject,
               html: personalizedHtml,
               text: this.htmlToText(personalizedHtml),
-              replyTo: campaign.fromEmail || template.fromEmail,
+              replyTo: campaign.fromEmail,
               variables: recipient.variables
             });
 
@@ -599,8 +599,8 @@ export class CampaignService {
       const campaign: Campaign = {
         id: emailCampaign.campaignId,
         name: emailCampaign.name,
-        templateId: emailCampaign.templateId,
-        smtpProviderId: emailCampaign.smtpProviderId,
+        templateId: typeof emailCampaign.templateId === 'string' ? emailCampaign.templateId : emailCampaign.templateId[0],
+        smtpProviderId: typeof emailCampaign.smtpProviderId === 'string' ? emailCampaign.smtpProviderId : emailCampaign.smtpProviderId[0],
         status: emailCampaign.status === 'sent' ? 'completed' : emailCampaign.status as 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed' | 'paused',
         recipients: emailCampaign.recipients.map(email => ({ 
           email, 
@@ -814,4 +814,4 @@ export class CampaignService {
       return { success: false, error: error.message };
     }
   }
-} 
+}

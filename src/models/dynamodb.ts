@@ -52,8 +52,6 @@ export interface EmailTemplate {
   userId: string;
   name: string;
   subject: string;
-  fromName: string;
-  fromEmail: string;
   htmlContent: string;
   textContent?: string;
   variables?: string[];

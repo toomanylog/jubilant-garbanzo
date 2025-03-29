@@ -84,7 +84,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
     smtpProviderId: '',
     fromName: '',
     fromEmail: '',
-    recipients: '',
+    recipients: '' as string,
     content: ''
   };
 
@@ -172,8 +172,6 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
     const selectedTemplate = templates.find(t => t.templateId === templateId);
     if (selectedTemplate) {
       formik.setFieldValue('subject', selectedTemplate.subject);
-      formik.setFieldValue('fromName', selectedTemplate.fromName);
-      formik.setFieldValue('fromEmail', selectedTemplate.fromEmail);
     }
   };
 
@@ -196,10 +194,15 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
       
       try {
         // Transformer les recipients en tableau
-        const recipientsArray = values.recipients
-          .split('\n')
-          .map(email => email.trim())
-          .filter(email => email !== '');
+        let recipientsArray: string[] = [];
+        if (typeof values.recipients === 'string') {
+          recipientsArray = values.recipients
+            .split('\n')
+            .map(email => email.trim())
+            .filter(email => email !== '');
+        } else {
+          recipientsArray = values.recipients;
+        }
         
         // Validation des emails des destinataires
         const invalidEmails = recipientsArray.filter(email => !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/));

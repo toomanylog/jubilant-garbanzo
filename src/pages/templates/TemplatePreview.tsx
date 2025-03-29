@@ -242,12 +242,10 @@ const TemplatePreview: React.FC = () => {
             </Typography>
             <Divider sx={{ mb: 2 }} />
             
-            <Typography variant="subtitle2" color="text.secondary">
-              Sujet
-            </Typography>
-            <Typography variant="body1" gutterBottom>
-              {TemplateService.parseTemplate(template.subject, variables)}
-            </Typography>
+            <div className="flex flex-col mb-4">
+              <div className="text-gray-600 text-sm mb-1">De:</div>
+              <div className="font-medium">Défini lors de la campagne</div>
+            </div>
             
             <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2 }}>
               Expéditeur
@@ -276,7 +274,7 @@ const TemplatePreview: React.FC = () => {
                 top: 0
               }}>
                 <Typography variant="caption" sx={{ display: 'block', textAlign: 'center' }}>
-                  De: {template.fromName} &lt;{template.fromEmail}&gt;
+                  De: Défini lors de la campagne
                 </Typography>
                 <Typography variant="caption" sx={{ display: 'block', textAlign: 'center' }}>
                   Objet: {TemplateService.parseTemplate(template.subject, variables)}
