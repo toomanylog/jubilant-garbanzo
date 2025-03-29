@@ -42,6 +42,7 @@
     "dayjs": "^1.11.10",
     "formik": "^2.4.5",
     "lucide-react": "^0.485.0",
+    "papaparse": "^5.5.2",
     "react": "^18.2.0",
     "react-codemirror2": "^8.0.1",
     "react-dom": "^18.2.0",
@@ -83,6 +84,7 @@
     ]
   },
   "devDependencies": {
+    "@types/papaparse": "^5.3.15",
     "@types/uuid": "^9.0.8",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.3",

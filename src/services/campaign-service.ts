@@ -8,14 +8,7 @@ import {
   getEmailCampaignById,
   EmailTemplate,
   SmtpProvider,
-  Recipient,
   EmailCampaignStats,
-  AwsSmtpDetails,
-  createCampaignItem,
-  getCampaigns,
-  getCampaign,
-  updateCampaign,
-  deleteCampaign,
   updateEmailTrackingStatus
 } from '../models/dynamodb';
 import { createSmtpService, EmailOptions } from './smtp-service';

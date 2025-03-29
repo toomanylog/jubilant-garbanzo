@@ -16,6 +16,13 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import Papa from 'papaparse';
 
+// Définition des types pour Papa.parse
+interface ParseResult {
+  data: any[][];
+  errors: Papa.ParseError[];
+  meta: Papa.ParseMeta;
+}
+
 interface FileImportCampaignProps {
   onImportSuccess: (emails: string[]) => void;
   maxFileSize?: number; // En Mo
@@ -62,7 +69,7 @@ const FileImportCampaign: React.FC<FileImportCampaignProps> = ({
     }, 200);
     
     try {
-      Papa.parse(file, {
+      Papa.parse<string[]>(file, {
         skipEmptyLines: true,
         complete: (results) => {
           clearInterval(progressInterval);
@@ -70,7 +77,7 @@ const FileImportCampaign: React.FC<FileImportCampaignProps> = ({
           
           // Extraire les emails des données du CSV
           const emails: string[] = results.data
-            .map((row: any) => {
+            .map((row) => {
               // Si c'est une ligne avec un seul élément, le considérer comme un email
               if (Array.isArray(row) && row.length === 1) {
                 return row[0];
@@ -78,7 +85,7 @@ const FileImportCampaign: React.FC<FileImportCampaignProps> = ({
               
               // Si c'est une ligne avec plusieurs colonnes, chercher une colonne qui contient un email
               if (Array.isArray(row) && row.length > 1) {
-                const possibleEmail = row.find((cell: any) => 
+                const possibleEmail = row.find((cell) => 
                   typeof cell === 'string' && isValidEmail(cell)
                 );
                 return possibleEmail || '';
@@ -87,13 +94,13 @@ const FileImportCampaign: React.FC<FileImportCampaignProps> = ({
               // Si c'est juste une chaîne
               return typeof row === 'string' ? row : '';
             })
-            .filter(email => email.trim() !== '');
+            .filter((email: string) => email.trim() !== '');
           
           // Valider les emails
           const valid: string[] = [];
           const invalid: string[] = [];
           
-          emails.forEach(email => {
+          emails.forEach((email: string) => {
             if (isValidEmail(email)) {
               valid.push(email.trim());
             } else {
@@ -114,7 +121,7 @@ const FileImportCampaign: React.FC<FileImportCampaignProps> = ({
           
           setIsUploading(false);
         },
-        error: (error) => {
+        error: (error: Error) => {
           clearInterval(progressInterval);
           setError(`Erreur lors de l'analyse du fichier: ${error.message}`);
           setIsUploading(false);
