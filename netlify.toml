@@ -9,15 +9,14 @@
   NODE_VERSION = "16"
   AWS_LAMBDA_JS_RUNTIME = "nodejs16.x"
 
-# Gestion des routes SPA (Single Page Application)
+# Gestion des routes SPA (Single Page Application) - doit être en dernier
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  force = false
-  conditions = {Role = ["anonymous", "user"]}
-  
-# Redirections pour les fonctions de tracking
+  force = true
+
+# Redirections pour les fonctions de tracking (priorité élevée)
 [[redirects]]
   from = "/track/p/*"
   to = "/.netlify/functions/tracking-pixel"
