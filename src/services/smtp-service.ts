@@ -106,9 +106,58 @@ abstract class SmtpService {
 
   // Détecte si le contenu est au format HTML
   protected isHtmlContent(content: string): boolean {
-    // Vérifier si le contenu contient des balises HTML
+    // Version plus robuste pour détecter le HTML
+    // 1. Recherche de balises HTML courantes
     const htmlRegex = /<([a-z][a-z0-9]*)\b[^>]*>(.*?)<\/\1>/i;
-    return htmlRegex.test(content) || content.includes('<html') || content.includes('<body') || content.includes('<div') || content.includes('<p');
+    // 2. Recherche de balises auto-fermantes
+    const selfClosingRegex = /<([a-z][a-z0-9]*)\b[^>]*\/>/i;
+    // 3. Recherche de balises HTML structurelles
+    const structuralTags = ['html', 'body', 'div', 'p', 'span', 'table', 'tr', 'td', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+    
+    // Vérifier si le contenu contient des balises HTML
+    const hasHtmlTags = htmlRegex.test(content);
+    const hasSelfClosingTags = selfClosingRegex.test(content);
+    const hasStructuralTags = structuralTags.some(tag => 
+      content.includes(`<${tag}`) || content.includes(`<${tag} `)
+    );
+    
+    // Si le contenu contient des balises HTML, c'est du HTML
+    return hasHtmlTags || hasSelfClosingTags || hasStructuralTags;
+  }
+
+  // Convertit HTML en texte pour les lecteurs de mails qui ne supportent pas le HTML
+  protected htmlToText(html: string): string {
+    // Supprimer les balises style et script avec leur contenu
+    let text = html
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+    
+    // Remplacer les sauts de ligne HTML par des sauts de ligne texte
+    text = text
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<\/div>/gi, '\n');
+    
+    // Supprimer toutes les autres balises HTML
+    text = text.replace(/<[^>]+>/g, '');
+    
+    // Convertir les entités HTML courantes
+    text = text
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#039;/g, "'")
+      .replace(/&rsquo;/g, "'")
+      .replace(/&lsquo;/g, "'")
+      .replace(/&ldquo;/g, '"')
+      .replace(/&rdquo;/g, '"');
+    
+    // Supprimer les espaces multiples et les espaces en début/fin
+    text = text.replace(/\s+/g, ' ').trim();
+    
+    return text;
   }
 
   abstract sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }>;
@@ -205,9 +254,12 @@ export class AwsSesService extends SmtpService {
       
       console.log(`⚠️ Envoi d'email - De: ${source}`);
 
-      // Détecter si le contenu est HTML
-      const isHtml = this.isHtmlContent(options.html);
-      console.log(`⚠️ Envoi d'email - Format détecté: ${isHtml ? 'HTML' : 'Texte'}`);
+      // Toujours considérer le contenu comme HTML pour les emails de templates
+      const isHtml = true; // Forcer la détection HTML
+      console.log(`⚠️ Envoi d'email - Format: HTML (forcé pour compatibilité)`);
+
+      // Assurer que le texte est disponible
+      const textContent = options.text || this.htmlToText(options.html);
 
       const params = {
         Source: source,
@@ -226,7 +278,7 @@ export class AwsSesService extends SmtpService {
               Charset: 'UTF-8'
             },
             Text: {
-              Data: options.text || '',
+              Data: textContent,
               Charset: 'UTF-8'
             }
           }
@@ -264,6 +316,15 @@ export class SendgridService extends SmtpService {
 
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      // Vérifier les limites de taux
+      const rateCheck = await this.checkRateLimits();
+      if (!rateCheck.canSend) {
+        return {
+          success: false,
+          error: rateCheck.reason || 'Limite de taux atteinte'
+        };
+      }
+
       // Convertir 'to' en tableau si c'est une chaîne
       const toArray = Array.isArray(options.to) ? options.to : [options.to];
       
@@ -285,6 +346,9 @@ export class SendgridService extends SmtpService {
         fromEmail = options.from.email;
         fromName = options.from.name;
       }
+      
+      // Assurer que le texte est disponible
+      const textContent = options.text || this.htmlToText(options.html);
 
       const response = await axios.post(
         'https://api.sendgrid.com/v3/mail/send',
@@ -308,7 +372,7 @@ export class SendgridService extends SmtpService {
             },
             {
               type: 'text/plain',
-              value: options.text || ''
+              value: textContent
             }
           ],
           attachments: options.attachments
@@ -321,15 +385,17 @@ export class SendgridService extends SmtpService {
         }
       );
 
+      this.updateSendCounts();
+
       return {
         success: true,
         messageId: response.headers['x-message-id']
       };
     } catch (error: any) {
-      console.error('Erreur lors de l\'envoi d\'email via Sendgrid:', error);
+      console.error('Erreur lors de l\'envoi d\'email via SendGrid:', error);
       return {
         success: false,
-        error: error.response?.data?.message || error.message
+        error: error.response?.data?.errors?.[0]?.message || error.message
       };
     }
   }
@@ -349,6 +415,15 @@ export class MailjetService extends SmtpService {
 
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      // Vérifier les limites de taux
+      const rateCheck = await this.checkRateLimits();
+      if (!rateCheck.canSend) {
+        return {
+          success: false,
+          error: rateCheck.reason || 'Limite de taux atteinte'
+        };
+      }
+
       // Convertir 'to' en tableau si c'est une chaîne
       const toArray = Array.isArray(options.to) ? options.to : [options.to];
       
@@ -370,8 +445,10 @@ export class MailjetService extends SmtpService {
         fromEmail = options.from.email;
         fromName = options.from.name;
       }
+      
+      // Assurer que le texte est disponible
+      const textContent = options.text || this.htmlToText(options.html);
 
-      // Définir le type de réponse attendu de Mailjet
       interface MailjetResponse {
         Messages: Array<{
           Status: string;
@@ -400,7 +477,7 @@ export class MailjetService extends SmtpService {
               To: toArray.map((email: string) => ({ Email: email })),
               Subject: options.subject,
               HTMLPart: options.html,
-              TextPart: options.text || '',
+              TextPart: textContent,
               ReplyTo: options.replyTo ? { Email: options.replyTo } : undefined,
               Attachments: options.attachments ? options.attachments.map(att => ({
                 ContentType: att.contentType,
@@ -418,6 +495,8 @@ export class MailjetService extends SmtpService {
           }
         }
       );
+
+      this.updateSendCounts();
 
       return {
         success: true,
@@ -437,6 +516,15 @@ export class MailjetService extends SmtpService {
 export class CustomSmtpService extends SmtpService {
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      // Vérifier les limites de taux
+      const rateCheck = await this.checkRateLimits();
+      if (!rateCheck.canSend) {
+        return {
+          success: false,
+          error: rateCheck.reason || 'Limite de taux atteinte'
+        };
+      }
+
       // Convertir 'to' en tableau si c'est une chaîne
       const toArray = Array.isArray(options.to) ? options.to : [options.to];
       
@@ -458,6 +546,9 @@ export class CustomSmtpService extends SmtpService {
         fromEmail = options.from.email;
         fromName = options.from.name;
       }
+      
+      // Assurer que le texte est disponible
+      const textContent = options.text || this.htmlToText(options.html);
 
       // Envoi de la demande au backend
       const response = await fetch('/api/send-email', {
@@ -482,7 +573,7 @@ export class CustomSmtpService extends SmtpService {
             },
             subject: options.subject,
             html: options.html,
-            text: options.text,
+            text: textContent,
             replyTo: options.replyTo,
             attachments: options.attachments
           }
@@ -495,6 +586,9 @@ export class CustomSmtpService extends SmtpService {
       }
 
       const result = await response.json();
+      
+      this.updateSendCounts();
+      
       return {
         success: true,
         messageId: result.messageId || `custom-smtp-${Date.now()}`
@@ -513,6 +607,15 @@ export class CustomSmtpService extends SmtpService {
 export class Office365Service extends SmtpService {
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      // Vérifier les limites de taux
+      const rateCheck = await this.checkRateLimits();
+      if (!rateCheck.canSend) {
+        return {
+          success: false,
+          error: rateCheck.reason || 'Limite de taux atteinte'
+        };
+      }
+
       // Convertir 'to' en tableau si c'est une chaîne
       const toArray = Array.isArray(options.to) ? options.to : [options.to];
       
@@ -534,6 +637,9 @@ export class Office365Service extends SmtpService {
         fromEmail = options.from.email;
         fromName = options.from.name;
       }
+      
+      // Assurer que le texte est disponible
+      const textContent = options.text || this.htmlToText(options.html);
 
       // Envoi de la demande au backend
       const response = await fetch('/api/send-email', {
@@ -558,7 +664,7 @@ export class Office365Service extends SmtpService {
             },
             subject: options.subject,
             html: options.html,
-            text: options.text,
+            text: textContent,
             replyTo: options.replyTo,
             attachments: options.attachments
           }
@@ -571,6 +677,9 @@ export class Office365Service extends SmtpService {
       }
 
       const result = await response.json();
+      
+      this.updateSendCounts();
+      
       return {
         success: true,
         messageId: result.messageId || `office365-${Date.now()}`

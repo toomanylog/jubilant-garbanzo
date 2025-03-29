@@ -61,7 +61,10 @@ export class TemplateService {
     const subject = template.subject || '';
     
     // Remplace les variables dans le contenu HTML
-    const html = this.parseTemplate(htmlContent, variables);
+    let html = this.parseTemplate(htmlContent, variables);
+    
+    // S'assurer que le HTML a une structure complète
+    html = this.ensureCompleteHtmlStructure(html);
     
     // Remplace les variables dans le contenu texte s'il existe
     const text = textContent
@@ -139,5 +142,71 @@ export class TemplateService {
       console.error(`Erreur lors de la récupération du template ${templateId}:`, error);
       return null;
     }
+  }
+
+  /**
+   * Garantit qu'un contenu HTML a une structure complète (doctype, html, head, body)
+   * @param htmlContent Le contenu HTML à vérifier/compléter
+   * @returns Le contenu HTML avec une structure complète
+   */
+  static ensureCompleteHtmlStructure(htmlContent: string): string {
+    // Si le contenu est vide, retourner une structure HTML minimale
+    if (!htmlContent || htmlContent.trim() === '') {
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+</body>
+</html>`;
+    }
+
+    // Vérifier si le contenu a déjà un doctype
+    const hasDoctype = htmlContent.toLowerCase().includes('<!doctype') || htmlContent.toLowerCase().includes('<!DOCTYPE');
+    // Vérifier si le contenu a déjà des balises html
+    const hasHtmlTag = /<html\b[^>]*>/i.test(htmlContent);
+    // Vérifier si le contenu a déjà des balises body
+    const hasBodyTag = /<body\b[^>]*>/i.test(htmlContent);
+    // Vérifier si le contenu a déjà des balises head
+    const hasHeadTag = /<head\b[^>]*>/i.test(htmlContent);
+
+    // Si le contenu a déjà une structure complète, le retourner tel quel
+    if (hasDoctype && hasHtmlTag && hasHeadTag && hasBodyTag) {
+      return htmlContent;
+    }
+
+    // Si le contenu a déjà des balises body mais pas de structure complète,
+    // ajouter uniquement les balises manquantes
+    if (hasBodyTag && !hasDoctype) {
+      return `<!DOCTYPE html>\n${htmlContent}`;
+    }
+
+    if (hasBodyTag && !hasHtmlTag) {
+      return `<!DOCTYPE html>\n<html>\n${htmlContent}\n</html>`;
+    }
+
+    if (hasBodyTag && !hasHeadTag) {
+      // Insérer la balise head avant la balise body
+      return htmlContent.replace(/<body/i, '<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body');
+    }
+
+    // Si le contenu n'a pas de structure HTML du tout, l'envelopper dans une structure complète
+    if (!hasBodyTag) {
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+  ${htmlContent}
+</body>
+</html>`;
+    }
+
+    // Par défaut, retourner le contenu tel quel
+    return htmlContent;
   }
 } 
