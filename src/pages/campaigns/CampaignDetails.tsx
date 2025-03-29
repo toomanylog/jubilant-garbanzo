@@ -18,7 +18,20 @@ import {
   DialogTitle,
   DialogContent,
   DialogContentText,
-  DialogActions
+  DialogActions,
+  Card,
+  CardContent,
+  CardHeader,
+  Grid,
+  IconButton,
+  Tooltip,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
 } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import SendIcon from '@mui/icons-material/Send';
@@ -26,13 +39,25 @@ import RemoveRedEyeIcon from '@mui/icons-material/RemoveRedEye';
 import TouchAppIcon from '@mui/icons-material/TouchApp';
 import ErrorIcon from '@mui/icons-material/Error';
 import WarningIcon from '@mui/icons-material/Warning';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AlarmIcon from '@mui/icons-material/Alarm';
+import CancelIcon from '@mui/icons-material/Cancel';
+import EmailIcon from '@mui/icons-material/Email';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider, DateTimePicker } from '@mui/x-date-pickers';
+import dayjs from 'dayjs';
+import 'dayjs/locale/fr';
 import { toast } from 'react-toastify';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 import Layout from '../../components/layout/Layout';
 import { useAuth } from '../../contexts/AuthContext';
-import { EmailCampaign, EmailTemplate, SmtpProvider, getEmailCampaignById, getEmailTemplateById, getSmtpProviderById } from '../../models/dynamodb';
+import { EmailCampaign, EmailTemplate, SmtpProvider, getEmailCampaignById, getEmailTemplateById, getSmtpProviderById, deleteEmailCampaign } from '../../models/dynamodb';
 import { CampaignService } from '../../services/campaign-service';
 
 const CampaignDetails: React.FC = () => {
@@ -50,17 +75,23 @@ const CampaignDetails: React.FC = () => {
   const [openSendDialog, setOpenSendDialog] = useState(false);
   const [openScheduleDialog, setOpenScheduleDialog] = useState(false);
   const [openCancelDialog, setOpenCancelDialog] = useState(false);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [scheduledDate, setScheduledDate] = useState<Date | null>(new Date(Date.now() + 3600000)); // 1 heure plus tard
+  const [scheduledDate, setScheduledDate] = useState<dayjs.Dayjs | null>(dayjs().add(1, 'hour')); // 1 heure plus tard
 
   useEffect(() => {
     const fetchData = async () => {
       if (!currentUser || !campaignId) return;
       
       try {
+        setIsLoading(true);
+        
         // Récupérer la campagne
+        console.log("Chargement de la campagne avec ID:", campaignId);
         const campaignData = await getEmailCampaignById(campaignId);
+        
         if (!campaignData) {
+          console.error("Campagne non trouvée:", campaignId);
           setError('Campagne non trouvée');
           setIsLoading(false);
           return;
@@ -68,24 +99,33 @@ const CampaignDetails: React.FC = () => {
         
         // Vérifier que la campagne appartient à l'utilisateur courant
         if (campaignData.userId !== currentUser.userId) {
+          console.error("La campagne n'appartient pas à l'utilisateur:", {
+            campaignUserId: campaignData.userId,
+            currentUserId: currentUser.userId
+          });
           setError("Vous n'avez pas les droits pour voir cette campagne");
           setIsLoading(false);
           return;
         }
         
+        console.log("Campagne chargée avec succès:", campaignData.name);
         setCampaign(campaignData);
         
         // Récupérer le template et le fournisseur SMTP associés
+        console.log("Chargement du template et du fournisseur SMTP...");
         const [templateData, providerData] = await Promise.all([
           getEmailTemplateById(campaignData.templateId),
           getSmtpProviderById(campaignData.providerId)
         ]);
         
+        console.log("Template chargé:", templateData?.name);
+        console.log("Fournisseur SMTP chargé:", providerData?.name);
+        
         setTemplate(templateData);
         setProvider(providerData);
       } catch (err: any) {
         console.error('Erreur lors de la récupération des données:', err);
-        setError(err.message || 'Une erreur est survenue');
+        setError(err.message || 'Une erreur est survenue lors du chargement des données');
       } finally {
         setIsLoading(false);
       }
@@ -98,18 +138,36 @@ const CampaignDetails: React.FC = () => {
   const getCampaignStatusChip = (status: string) => {
     switch (status) {
       case 'draft':
-        return <Chip label="Brouillon" color="default" />;
+        return <Chip label="Brouillon" color="default" size="small" className="font-medium" />;
       case 'scheduled':
-        return <Chip label="Planifiée" color="primary" />;
+        return <Chip label="Planifiée" color="primary" size="small" className="font-medium" />;
       case 'sending':
-        return <Chip label="En cours d'envoi" color="warning" />;
+        return <Chip label="En cours d'envoi" color="warning" size="small" className="font-medium" />;
       case 'sent':
-        return <Chip label="Envoyée" color="success" />;
+        return <Chip label="Envoyée" color="success" size="small" className="font-medium" />;
       case 'failed':
-        return <Chip label="Échec" color="error" />;
+        return <Chip label="Échec" color="error" size="small" className="font-medium" />;
       default:
-        return <Chip label={status} color="default" />;
+        return <Chip label={status} color="default" size="small" className="font-medium" />;
     }
+  };
+
+  // Formatage des dates
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return '—';
+    
+    try {
+      return format(new Date(dateString), 'dd MMMM yyyy à HH:mm', { locale: fr });
+    } catch (error) {
+      console.error('Erreur de formatage de date:', error);
+      return dateString;
+    }
+  };
+
+  // Calcul des pourcentages pour les statistiques
+  const calculatePercent = (value: number, total: number) => {
+    if (total === 0) return 0;
+    return Math.round((value / total) * 100);
   };
 
   // Fonctions pour gérer les dialogues
@@ -121,12 +179,15 @@ const CampaignDetails: React.FC = () => {
   
   const handleOpenCancelDialog = () => setOpenCancelDialog(true);
   const handleCloseCancelDialog = () => setOpenCancelDialog(false);
+  
+  const handleOpenDeleteDialog = () => setOpenDeleteDialog(true);
+  const handleCloseDeleteDialog = () => setOpenDeleteDialog(false);
 
   // Fonctions pour gérer les actions de campagne
   const handleSendCampaign = async () => {
     if (!campaignId) return;
     
-    setIsLoading(true);
+    setIsProcessing(true);
     
     try {
       const result = await CampaignService.sendCampaign(campaignId);
@@ -139,30 +200,45 @@ const CampaignDetails: React.FC = () => {
         toast.error('Échec de l\'envoi de la campagne');
       }
     } catch (err: any) {
-      toast.error(err.message || 'Une erreur est survenue');
+      toast.error(err.message || 'Une erreur est survenue lors de l\'envoi');
     } finally {
-      setIsLoading(false);
-      setOpenSendDialog(false);
+      setIsProcessing(false);
+      handleCloseSendDialog();
     }
   };
 
   const handleScheduleCampaign = async () => {
     if (!campaignId || !scheduledDate) return;
     
+    // Vérifier que la date est dans le futur
+    if (scheduledDate.isBefore(dayjs())) {
+      toast.error('La date de planification doit être dans le futur');
+      return;
+    }
+    
     setIsProcessing(true);
     
     try {
-      const result = await CampaignService.scheduleCampaign(campaignId, scheduledDate);
-      
-      if (result.success) {
-        toast.success('La campagne a été planifiée avec succès');
-        // Recharger les données
-        window.location.reload();
-      } else {
-        toast.error(`Erreur lors de la planification: ${result.error}`);
+      // Mettre à jour le statut de la campagne
+      if (campaign) {
+        const updatedCampaign = {
+          ...campaign,
+          status: 'scheduled' as 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed',
+          scheduledAt: scheduledDate.toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        const result = await CampaignService.scheduleCampaign(campaignId, scheduledDate.toDate());
+        
+        if (result.success) {
+          toast.success('La campagne a été planifiée avec succès');
+          setCampaign(updatedCampaign);
+        } else {
+          toast.error(`Erreur lors de la planification: ${result.error}`);
+        }
       }
     } catch (err: any) {
-      toast.error(err.message || 'Une erreur est survenue');
+      toast.error(err.message || 'Une erreur est survenue lors de la planification');
     } finally {
       setIsProcessing(false);
       handleCloseScheduleDialog();
@@ -179,16 +255,47 @@ const CampaignDetails: React.FC = () => {
       
       if (result.success) {
         toast.success('La planification a été annulée avec succès');
-        // Recharger les données
-        window.location.reload();
+        
+        // Mettre à jour le statut local de la campagne
+        if (campaign) {
+          const updatedCampaign = {
+            ...campaign,
+            status: 'draft' as 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed',
+            scheduledAt: null,
+            updatedAt: new Date().toISOString()
+          };
+          setCampaign(updatedCampaign);
+        }
       } else {
         toast.error(`Erreur lors de l'annulation: ${result.error}`);
       }
     } catch (err: any) {
-      toast.error(err.message || 'Une erreur est survenue');
+      toast.error(err.message || 'Une erreur est survenue lors de l\'annulation');
     } finally {
       setIsProcessing(false);
       handleCloseCancelDialog();
+    }
+  };
+
+  const handleDeleteCampaign = async () => {
+    if (!campaignId) return;
+    
+    setIsProcessing(true);
+    
+    try {
+      const success = await deleteEmailCampaign(campaignId);
+      
+      if (success) {
+        toast.success('La campagne a été supprimée avec succès');
+        navigate('/campaigns');
+      } else {
+        toast.error('Erreur lors de la suppression de la campagne');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Une erreur est survenue lors de la suppression');
+    } finally {
+      setIsProcessing(false);
+      handleCloseDeleteDialog();
     }
   };
 
@@ -223,27 +330,34 @@ const CampaignDetails: React.FC = () => {
         toast.error(`Erreur lors de l'export: ${result.error}`);
       }
     } catch (err: any) {
-      toast.error(err.message || 'Une erreur est survenue');
+      toast.error(err.message || 'Une erreur est survenue lors de l\'export');
     }
   };
 
+  // Affichage pendant le chargement
   if (isLoading) {
     return (
       <Layout title="Détails de la campagne">
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <Box className="flex justify-center items-center h-[50vh]">
           <CircularProgress />
         </Box>
       </Layout>
     );
   }
 
+  // Affichage en cas d'erreur
   if (error || !campaign) {
     return (
       <Layout title="Détails de la campagne">
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" className="mb-4 rounded-lg">
           {error || 'Campagne non trouvée'}
         </Alert>
-        <Button variant="contained" onClick={() => navigate('/campaigns')}>
+        <Button 
+          variant="contained" 
+          color="primary"
+          onClick={() => navigate('/campaigns')}
+          startIcon={<ArrowBackIcon />}
+        >
           Retour à la liste des campagnes
         </Button>
       </Layout>
@@ -251,362 +365,501 @@ const CampaignDetails: React.FC = () => {
   }
 
   return (
-    <Layout title="Détails de la campagne">
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h4" component="h1">
-          {campaign.name}
-        </Typography>
-        <Box>
-          {campaign.status === 'draft' && (
-            <Button 
-              variant="contained" 
-              color="primary"
-              onClick={() => navigate(`/campaigns/${campaignId}`)}
-              sx={{ mr: 2 }}
-            >
-              Modifier
-            </Button>
-          )}
-          <Button 
-            variant="outlined" 
-            onClick={() => navigate('/campaigns')}
-          >
-            Retour
-          </Button>
-        </Box>
-      </Box>
-      
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
-        <Box sx={{ width: { xs: '100%', md: '60%' } }}>
-          <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6">Informations générales</Typography>
+    <Layout title={`Campagne: ${campaign.name}`}>
+      {/* En-tête */}
+      <Box className="mb-6">
+        <Box className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+          <Box>
+            <Box className="flex items-center gap-2">
+              <IconButton
+                color="primary"
+                onClick={() => navigate('/campaigns')}
+                className="mr-2"
+              >
+                <ArrowBackIcon />
+              </IconButton>
+              <Typography variant="h4" component="h1" className="font-bold text-gray-900 dark:text-white">
+                {campaign.name}
+              </Typography>
               {getCampaignStatusChip(campaign.status)}
             </Box>
-            
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Sujet
-                </Typography>
-                <Typography variant="body1" gutterBottom>
-                  {campaign.subject}
-                </Typography>
-              </Box>
-              
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Expéditeur
-                </Typography>
-                <Typography variant="body1" gutterBottom>
-                  {campaign.fromName} &lt;{campaign.fromEmail}&gt;
-                </Typography>
-              </Box>
-              
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Modèle utilisé
-                </Typography>
-                <Typography variant="body1" gutterBottom>
-                  {template ? template.name : 'Modèle inconnu'}
-                </Typography>
-              </Box>
-              
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Fournisseur SMTP
-                </Typography>
-                <Typography variant="body1" gutterBottom>
-                  {provider ? provider.name : 'Fournisseur inconnu'}
-                </Typography>
-              </Box>
-              
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Date de création
-                </Typography>
-                <Typography variant="body1" gutterBottom>
-                  {new Date(campaign.createdAt).toLocaleDateString()} {new Date(campaign.createdAt).toLocaleTimeString()}
-                </Typography>
-              </Box>
-              
-              {campaign.scheduledAt && (
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Date d'envoi planifiée
-                  </Typography>
-                  <Typography variant="body1" gutterBottom>
-                    {new Date(campaign.scheduledAt).toLocaleDateString()} {new Date(campaign.scheduledAt).toLocaleTimeString()}
-                  </Typography>
-                </Box>
-              )}
-              
-              {campaign.sentAt && (
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Date d'envoi effective
-                  </Typography>
-                  <Typography variant="body1" gutterBottom>
-                    {new Date(campaign.sentAt).toLocaleDateString()} {new Date(campaign.sentAt).toLocaleTimeString()}
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </Paper>
-          
-          <Paper elevation={2} sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Destinataires
+            <Typography variant="body1" color="textSecondary" className="mt-2">
+              Créée le {formatDate(campaign.createdAt)}
             </Typography>
-            
-            <Box sx={{ maxHeight: '300px', overflow: 'auto', mt: 2 }}>
-              <List dense>
-                {campaign.recipients.slice(0, 100).map((email, index) => (
-                  <ListItem key={index}>
-                    <ListItemIcon>
-                      <PersonIcon />
-                    </ListItemIcon>
-                    <ListItemText primary={email} />
-                  </ListItem>
-                ))}
-                {campaign.recipients.length > 100 && (
-                  <ListItem>
-                    <ListItemText 
-                      primary={`+ ${campaign.recipients.length - 100} autres destinataires`} 
-                      primaryTypographyProps={{ color: 'text.secondary', variant: 'body2' }}
-                    />
-                  </ListItem>
-                )}
-              </List>
-            </Box>
-          </Paper>
-        </Box>
-        
-        <Box sx={{ width: { xs: '100%', md: '40%' } }}>
-          <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Statistiques
-            </Typography>
-            
-            {campaign.status === 'sent' || campaign.status === 'sending' ? (
-              <Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="body2">Emails envoyés</Typography>
-                  <Typography variant="body2" fontWeight="bold">
-                    {campaign.stats.sent} / {campaign.stats.total}
-                  </Typography>
-                </Box>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={(campaign.stats.sent / campaign.stats.total) * 100} 
-                  sx={{ mb: 2, height: 10, borderRadius: 5 }}
-                />
-                
-                <Divider sx={{ my: 2 }} />
-                
-                <Typography variant="subtitle2" gutterBottom>
-                  Détails
-                </Typography>
-                
-                <List dense disablePadding>
-                  <ListItem sx={{ py: 0.5 }}>
-                    <ListItemIcon sx={{ minWidth: 36 }}>
-                      <SendIcon color="primary" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary="Livrés" 
-                      secondary={`${campaign.stats.delivered} (${Math.round((campaign.stats.delivered / campaign.stats.sent) * 100) || 0}%)`}
-                    />
-                  </ListItem>
-                  
-                  <ListItem sx={{ py: 0.5 }}>
-                    <ListItemIcon sx={{ minWidth: 36 }}>
-                      <RemoveRedEyeIcon color="info" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary="Ouverts" 
-                      secondary={`${campaign.stats.opened} (${Math.round((campaign.stats.opened / campaign.stats.delivered) * 100) || 0}%)`}
-                    />
-                  </ListItem>
-                  
-                  <ListItem sx={{ py: 0.5 }}>
-                    <ListItemIcon sx={{ minWidth: 36 }}>
-                      <TouchAppIcon color="success" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary="Cliqués" 
-                      secondary={`${campaign.stats.clicked} (${Math.round((campaign.stats.clicked / campaign.stats.opened) * 100) || 0}%)`}
-                    />
-                  </ListItem>
-                  
-                  <ListItem sx={{ py: 0.5 }}>
-                    <ListItemIcon sx={{ minWidth: 36 }}>
-                      <ErrorIcon color="error" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary="Rebonds" 
-                      secondary={`${campaign.stats.bounced} (${Math.round((campaign.stats.bounced / campaign.stats.sent) * 100) || 0}%)`}
-                    />
-                  </ListItem>
-                  
-                  <ListItem sx={{ py: 0.5 }}>
-                    <ListItemIcon sx={{ minWidth: 36 }}>
-                      <WarningIcon color="warning" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary="Plaintes" 
-                      secondary={`${campaign.stats.complaints} (${Math.round((campaign.stats.complaints / campaign.stats.sent) * 100) || 0}%)`}
-                    />
-                  </ListItem>
-                </List>
-              </Box>
-            ) : (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                Les statistiques seront disponibles après l'envoi de la campagne.
-              </Typography>
-            )}
-          </Paper>
-          
-          <Paper elevation={2} sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Actions
-            </Typography>
-            
-            <Button 
-              variant="outlined" 
-              fullWidth 
-              sx={{ mb: 2 }}
-              onClick={() => {
-                if (template) {
-                  window.open(`/templates/${template.templateId}/preview`, '_blank');
-                } else {
-                  toast.error('Modèle non disponible');
-                }
-              }}
-            >
-              Prévisualiser le modèle
-            </Button>
-            
+          </Box>
+
+          <Box className="flex flex-wrap gap-2">
             {campaign.status === 'draft' && (
               <>
-                <Button 
-                  variant="contained" 
-                  color="primary" 
-                  fullWidth 
-                  sx={{ mb: 2 }}
-                  onClick={handleOpenSendDialog}
-                >
-                  Envoyer maintenant
-                </Button>
-                
-                <Button 
-                  variant="outlined" 
-                  color="primary" 
-                  fullWidth
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<AlarmIcon />}
                   onClick={handleOpenScheduleDialog}
                 >
-                  Planifier l'envoi
+                  Planifier
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<SendIcon />}
+                  onClick={handleOpenSendDialog}
+                >
+                  Envoyer
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<EditIcon />}
+                  onClick={() => navigate(`/campaigns/${campaignId}`)}
+                >
+                  Modifier
                 </Button>
               </>
             )}
             
             {campaign.status === 'scheduled' && (
-              <Button 
-                variant="outlined" 
-                color="warning" 
-                fullWidth
+              <Button
+                variant="outlined"
+                color="warning"
+                startIcon={<CancelIcon />}
                 onClick={handleOpenCancelDialog}
               >
-                Annuler l'envoi planifié
+                Annuler la planification
               </Button>
             )}
             
-            {campaign.status === 'sent' && (
-              <Button 
-                variant="outlined" 
-                color="primary" 
-                fullWidth
+            {(campaign.status === 'sent' || campaign.status === 'failed') && (
+              <Button
+                variant="outlined"
+                startIcon={<FileDownloadIcon />}
                 onClick={handleExportStats}
               >
-                Exporter les statistiques (CSV)
+                Exporter les statistiques
               </Button>
             )}
-          </Paper>
+            
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={handleOpenDeleteDialog}
+            >
+              Supprimer
+            </Button>
+          </Box>
         </Box>
       </Box>
-      
-      {/* Dialogue de confirmation d'envoi */}
-      <Dialog open={openSendDialog} onClose={handleCloseSendDialog}>
-        <DialogTitle>Confirmer l'envoi</DialogTitle>
+
+      <Grid container spacing={3}>
+        {/* Informations de la campagne */}
+        <Grid item xs={12} md={6}>
+          <Card className="border border-gray-200 dark:border-gray-700 shadow-sm rounded-xl mb-4">
+            <CardHeader
+              title="Informations de la campagne"
+              className="border-b border-gray-200 bg-gray-50 px-6 py-3"
+              titleTypographyProps={{ variant: 'subtitle1', className: 'font-semibold' }}
+            />
+            <CardContent className="p-6">
+              <List disablePadding>
+                <ListItem divider className="px-0">
+                  <ListItemText 
+                    primary="Statut" 
+                    secondary={
+                      <Box className="flex items-center mt-1">
+                        {getCampaignStatusChip(campaign.status)}
+                        {campaign.status === 'scheduled' && (
+                          <Typography variant="body2" className="ml-2">
+                            Planifiée pour le {formatDate(campaign.scheduledAt)}
+                          </Typography>
+                        )}
+                        {campaign.status === 'sent' && (
+                          <Typography variant="body2" className="ml-2">
+                            Envoyée le {formatDate(campaign.sentAt)}
+                          </Typography>
+                        )}
+                      </Box>
+                    }
+                  />
+                </ListItem>
+                
+                <ListItem divider className="px-0">
+                  <ListItemText 
+                    primary="Modèle d'email" 
+                    secondary={template ? template.name : 'Non disponible'}
+                  />
+                </ListItem>
+                
+                <ListItem divider className="px-0">
+                  <ListItemText 
+                    primary="Fournisseur SMTP" 
+                    secondary={provider ? provider.name : 'Non disponible'}
+                  />
+                </ListItem>
+                
+                <ListItem divider className="px-0">
+                  <ListItemText 
+                    primary="Objet" 
+                    secondary={campaign.subject}
+                  />
+                </ListItem>
+                
+                <ListItem divider className="px-0">
+                  <ListItemText 
+                    primary="Expéditeur" 
+                    secondary={`${campaign.fromName} <${campaign.fromEmail}>`}
+                  />
+                </ListItem>
+                
+                <ListItem className="px-0">
+                  <ListItemText 
+                    primary="Destinataires" 
+                    secondary={
+                      <Box className="mt-1">
+                        <Chip 
+                          label={`${campaign.recipients.length} destinataires`} 
+                          size="small" 
+                          color="primary"
+                        />
+                      </Box>
+                    }
+                  />
+                </ListItem>
+              </List>
+            </CardContent>
+          </Card>
+          
+          {campaign.recipients.length > 0 && (
+            <Card className="border border-gray-200 dark:border-gray-700 shadow-sm rounded-xl">
+              <CardHeader
+                title={`Liste des destinataires (${campaign.recipients.length})`}
+                className="border-b border-gray-200 bg-gray-50 px-6 py-3"
+                titleTypographyProps={{ variant: 'subtitle1', className: 'font-semibold' }}
+              />
+              <CardContent className="p-0">
+                <List 
+                  sx={{ 
+                    maxHeight: 300, 
+                    overflow: 'auto',
+                    padding: 0
+                  }}
+                >
+                  {campaign.recipients.map((email, index) => (
+                    <ListItem key={email} divider={index < campaign.recipients.length - 1}>
+                      <ListItemIcon>
+                        <PersonIcon fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText primary={email} />
+                    </ListItem>
+                  ))}
+                </List>
+              </CardContent>
+            </Card>
+          )}
+        </Grid>
+
+        {/* Statistiques de la campagne */}
+        <Grid item xs={12} md={6}>
+          <Card className="border border-gray-200 dark:border-gray-700 shadow-sm rounded-xl">
+            <CardHeader
+              title="Statistiques de la campagne"
+              className="border-b border-gray-200 bg-gray-50 px-6 py-3"
+              titleTypographyProps={{ variant: 'subtitle1', className: 'font-semibold' }}
+            />
+            <CardContent className="p-6">
+              {campaign.status === 'draft' || campaign.status === 'scheduled' ? (
+                <Alert severity="info" className="rounded-lg">
+                  Les statistiques seront disponibles une fois la campagne envoyée.
+                </Alert>
+              ) : (
+                <Box>
+                  <Box className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                    <Box className="p-4 border border-gray-200 rounded-lg text-center">
+                      <Typography variant="h5" className="font-bold text-primary">
+                        {campaign.stats.sent}
+                      </Typography>
+                      <Typography variant="body2" className="text-gray-600">
+                        Emails envoyés
+                      </Typography>
+                    </Box>
+                    
+                    <Box className="p-4 border border-gray-200 rounded-lg text-center">
+                      <Typography variant="h5" className="font-bold text-green-600">
+                        {campaign.stats.delivered}
+                      </Typography>
+                      <Typography variant="body2" className="text-gray-600">
+                        Emails délivrés
+                      </Typography>
+                    </Box>
+                    
+                    <Box className="p-4 border border-gray-200 rounded-lg text-center">
+                      <Typography variant="h5" className="font-bold text-amber-600">
+                        {campaign.stats.opened}
+                      </Typography>
+                      <Typography variant="body2" className="text-gray-600">
+                        Emails ouverts
+                      </Typography>
+                    </Box>
+                    
+                    <Box className="p-4 border border-gray-200 rounded-lg text-center">
+                      <Typography variant="h5" className="font-bold text-blue-600">
+                        {campaign.stats.clicked}
+                      </Typography>
+                      <Typography variant="body2" className="text-gray-600">
+                        Clics
+                      </Typography>
+                    </Box>
+                    
+                    <Box className="p-4 border border-gray-200 rounded-lg text-center">
+                      <Typography variant="h5" className="font-bold text-red-600">
+                        {campaign.stats.bounced}
+                      </Typography>
+                      <Typography variant="body2" className="text-gray-600">
+                        Rebonds
+                      </Typography>
+                    </Box>
+                    
+                    <Box className="p-4 border border-gray-200 rounded-lg text-center">
+                      <Typography variant="h5" className="font-bold text-red-600">
+                        {campaign.stats.complaints}
+                      </Typography>
+                      <Typography variant="body2" className="text-gray-600">
+                        Plaintes
+                      </Typography>
+                    </Box>
+                  </Box>
+                  
+                  <Divider className="my-4" />
+                  
+                  <Typography variant="subtitle2" className="font-semibold mb-3">
+                    Taux de performance
+                  </Typography>
+                  
+                  <Box className="space-y-4">
+                    <Box>
+                      <Box className="flex justify-between items-center mb-1">
+                        <Typography variant="body2">
+                          Taux de délivrance
+                        </Typography>
+                        <Typography variant="body2" className="font-medium">
+                          {calculatePercent(campaign.stats.delivered, campaign.stats.sent)}%
+                        </Typography>
+                      </Box>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={calculatePercent(campaign.stats.delivered, campaign.stats.sent)} 
+                        className="h-2 rounded-full"
+                      />
+                    </Box>
+                    
+                    <Box>
+                      <Box className="flex justify-between items-center mb-1">
+                        <Typography variant="body2">
+                          Taux d'ouverture
+                        </Typography>
+                        <Typography variant="body2" className="font-medium">
+                          {calculatePercent(campaign.stats.opened, campaign.stats.delivered)}%
+                        </Typography>
+                      </Box>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={calculatePercent(campaign.stats.opened, campaign.stats.delivered)} 
+                        color="success"
+                        className="h-2 rounded-full"
+                      />
+                    </Box>
+                    
+                    <Box>
+                      <Box className="flex justify-between items-center mb-1">
+                        <Typography variant="body2">
+                          Taux de clic
+                        </Typography>
+                        <Typography variant="body2" className="font-medium">
+                          {calculatePercent(campaign.stats.clicked, campaign.stats.opened)}%
+                        </Typography>
+                      </Box>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={calculatePercent(campaign.stats.clicked, campaign.stats.opened)} 
+                        color="secondary"
+                        className="h-2 rounded-full"
+                      />
+                    </Box>
+                    
+                    <Box>
+                      <Box className="flex justify-between items-center mb-1">
+                        <Typography variant="body2">
+                          Taux de rebond
+                        </Typography>
+                        <Typography variant="body2" className="font-medium">
+                          {calculatePercent(campaign.stats.bounced, campaign.stats.sent)}%
+                        </Typography>
+                      </Box>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={calculatePercent(campaign.stats.bounced, campaign.stats.sent)} 
+                        color="error"
+                        className="h-2 rounded-full"
+                      />
+                    </Box>
+                  </Box>
+                  
+                  {campaign.status === 'sent' && (
+                    <Box className="mt-6">
+                      <Button
+                        variant="outlined"
+                        startIcon={<FileDownloadIcon />}
+                        fullWidth
+                        onClick={handleExportStats}
+                      >
+                        Exporter les statistiques complètes (CSV)
+                      </Button>
+                    </Box>
+                  )}
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Dialogues de confirmation */}
+      {/* Dialogue d'envoi */}
+      <Dialog open={openSendDialog} onClose={() => !isProcessing && handleCloseSendDialog()}>
+        <DialogTitle>Envoyer la campagne</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Vous êtes sur le point d'envoyer cette campagne à {campaign.recipients.length} destinataire(s).
-            Cette action est irréversible. Voulez-vous continuer ?
+            Êtes-vous sûr de vouloir envoyer cette campagne maintenant ? 
+            Une fois envoyée, la campagne ne pourra plus être modifiée.
+            
+            <Box className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <Typography variant="subtitle2" className="font-semibold">
+                Détails de l'envoi:
+              </Typography>
+              <List dense disablePadding>
+                <ListItem disablePadding>
+                  <Typography variant="body2">
+                    • <strong>Nom:</strong> {campaign.name}
+                  </Typography>
+                </ListItem>
+                <ListItem disablePadding>
+                  <Typography variant="body2">
+                    • <strong>Destinataires:</strong> {campaign.recipients.length}
+                  </Typography>
+                </ListItem>
+                <ListItem disablePadding>
+                  <Typography variant="body2">
+                    • <strong>Modèle:</strong> {template?.name || 'Non disponible'}
+                  </Typography>
+                </ListItem>
+                <ListItem disablePadding>
+                  <Typography variant="body2">
+                    • <strong>Fournisseur:</strong> {provider?.name || 'Non disponible'}
+                  </Typography>
+                </ListItem>
+              </List>
+            </Box>
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseSendDialog} disabled={isProcessing}>Annuler</Button>
+          <Button onClick={handleCloseSendDialog} disabled={isProcessing}>
+            Annuler
+          </Button>
           <Button 
             onClick={handleSendCampaign} 
             color="primary" 
+            variant="contained"
             disabled={isProcessing}
-            startIcon={isProcessing ? <CircularProgress size={20} /> : null}
+            startIcon={isProcessing ? <CircularProgress size={20} /> : <SendIcon />}
           >
-            {isProcessing ? 'Envoi en cours...' : 'Envoyer'}
+            {isProcessing ? 'Envoi en cours...' : 'Envoyer maintenant'}
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* Dialogue de planification */}
-      <Dialog open={openScheduleDialog} onClose={handleCloseScheduleDialog}>
+      <Dialog open={openScheduleDialog} onClose={() => !isProcessing && handleCloseScheduleDialog()}>
         <DialogTitle>Planifier l'envoi</DialogTitle>
         <DialogContent>
-          <DialogContentText gutterBottom>
-            Veuillez sélectionner la date et l'heure à laquelle vous souhaitez envoyer cette campagne.
+          <DialogContentText className="mb-4">
+            Sélectionnez la date et l'heure à laquelle vous souhaitez envoyer cette campagne.
           </DialogContentText>
-          <Box sx={{ mt: 2 }}>
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <DateTimePicker
-                label="Date et heure d'envoi"
-                value={scheduledDate}
-                onChange={(newValue) => setScheduledDate(newValue)}
-                minDateTime={new Date()}
-                slotProps={{ textField: { fullWidth: true } }}
-              />
-            </LocalizationProvider>
-          </Box>
+          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="fr">
+            <DateTimePicker
+              label="Date et heure d'envoi"
+              value={scheduledDate}
+              onChange={(newValue) => setScheduledDate(newValue)}
+              minDateTime={dayjs().add(5, 'minute')}
+              className="w-full"
+              slotProps={{
+                textField: {
+                  fullWidth: true,
+                  variant: 'outlined'
+                }
+              }}
+            />
+          </LocalizationProvider>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseScheduleDialog} disabled={isProcessing}>Annuler</Button>
+          <Button onClick={handleCloseScheduleDialog} disabled={isProcessing}>
+            Annuler
+          </Button>
           <Button 
             onClick={handleScheduleCampaign} 
             color="primary" 
+            variant="contained"
             disabled={isProcessing || !scheduledDate}
-            startIcon={isProcessing ? <CircularProgress size={20} /> : null}
+            startIcon={isProcessing ? <CircularProgress size={20} /> : <AlarmIcon />}
           >
-            {isProcessing ? 'Planification...' : 'Planifier'}
+            {isProcessing ? 'Planification...' : 'Planifier l\'envoi'}
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* Dialogue d'annulation de planification */}
-      <Dialog open={openCancelDialog} onClose={handleCloseCancelDialog}>
-        <DialogTitle>Annuler l'envoi planifié</DialogTitle>
+      <Dialog open={openCancelDialog} onClose={() => !isProcessing && handleCloseCancelDialog()}>
+        <DialogTitle>Annuler la planification</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Voulez-vous vraiment annuler l'envoi planifié de cette campagne ?
-            La campagne repassera en état "brouillon".
+            Êtes-vous sûr de vouloir annuler la planification de cette campagne ? 
+            La campagne reviendra à l'état de brouillon.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseCancelDialog} disabled={isProcessing}>Non</Button>
+          <Button onClick={handleCloseCancelDialog} disabled={isProcessing}>
+            Conserver la planification
+          </Button>
           <Button 
             onClick={handleCancelScheduledCampaign} 
             color="warning" 
+            variant="contained"
             disabled={isProcessing}
-            startIcon={isProcessing ? <CircularProgress size={20} /> : null}
+            startIcon={isProcessing ? <CircularProgress size={20} /> : <CancelIcon />}
           >
-            {isProcessing ? 'Annulation...' : 'Oui, annuler'}
+            {isProcessing ? 'Annulation...' : 'Annuler la planification'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialogue de suppression */}
+      <Dialog open={openDeleteDialog} onClose={() => !isProcessing && handleCloseDeleteDialog()}>
+        <DialogTitle>Supprimer la campagne</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Êtes-vous sûr de vouloir supprimer cette campagne ? Cette action est irréversible.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} disabled={isProcessing}>
+            Annuler
+          </Button>
+          <Button 
+            onClick={handleDeleteCampaign} 
+            color="error" 
+            variant="contained"
+            disabled={isProcessing}
+            startIcon={isProcessing ? <CircularProgress size={20} /> : <DeleteIcon />}
+          >
+            {isProcessing ? 'Suppression...' : 'Supprimer'}
           </Button>
         </DialogActions>
       </Dialog>
