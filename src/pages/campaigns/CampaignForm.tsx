@@ -411,7 +411,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
                       if (Array.isArray(newValue)) {
                         formik.setFieldValue('templateId', newValue.map(item => item.templateId));
                       } else {
-                        formik.setFieldValue('templateId', newValue.templateId);
+                        formik.setFieldValue('templateId', (newValue as EmailTemplate).templateId);
                       }
                     } else {
                       formik.setFieldValue('templateId', '');
@@ -454,7 +454,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
                       if (Array.isArray(newValue)) {
                         formik.setFieldValue('smtpProviderId', newValue.map(item => item.providerId));
                       } else {
-                        formik.setFieldValue('smtpProviderId', newValue.providerId);
+                        formik.setFieldValue('smtpProviderId', (newValue as SmtpProvider).providerId);
                       }
                     } else {
                       formik.setFieldValue('smtpProviderId', '');

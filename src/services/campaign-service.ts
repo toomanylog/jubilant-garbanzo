@@ -773,9 +773,9 @@ export class CampaignService {
         sentAt: emailCampaign.sentAt ? new Date(emailCampaign.sentAt).getTime() : undefined,
         createdAt: new Date(emailCampaign.createdAt).getTime(),
         updatedAt: new Date(emailCampaign.updatedAt).getTime(),
-        subject: emailCampaign.subject,
-        fromName: emailCampaign.fromName,
-        fromEmail: emailCampaign.fromEmail,
+        subject: typeof emailCampaign.subject === 'string' ? emailCampaign.subject : emailCampaign.subject?.[0] || '',
+        fromName: typeof emailCampaign.fromName === 'string' ? emailCampaign.fromName : emailCampaign.fromName?.[0] || '',
+        fromEmail: typeof emailCampaign.fromEmail === 'string' ? emailCampaign.fromEmail : emailCampaign.fromEmail?.[0] || '',
         stats: {
           delivered: emailCampaign.stats.delivered,
           failed: emailCampaign.stats.bounced + (emailCampaign.stats.total - emailCampaign.stats.sent),

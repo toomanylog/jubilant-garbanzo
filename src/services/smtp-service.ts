@@ -47,9 +47,16 @@ abstract class SmtpService {
   // Vérification des limites de taux
   protected async checkRateLimits(): Promise<{ canSend: boolean, reason?: string }> {
     const now = Date.now();
-    const rateLimits = this.provider.rateLimits;
+    
+    // Utiliser les nouvelles propriétés au lieu de rateLimits
+    const perSecond = this.provider.sendingRatePerSecond;
+    const perMinute = this.provider.sendingRatePerMinute;
+    const perHour = this.provider.sendingRatePerHour;
+    const perDay = this.provider.sendingRatePerDay;
+    const dailyQuota = this.provider.dailyQuota;
 
-    if (!rateLimits) {
+    // Si aucune limite n'est définie, autoriser l'envoi
+    if (!perSecond && !perMinute && !perHour && !perDay && !dailyQuota) {
       return { canSend: true };
     }
 
@@ -68,20 +75,20 @@ abstract class SmtpService {
     }
 
     // Vérifier les limites
-    if (rateLimits.perSecond && this.sendCounts.second.count >= rateLimits.perSecond) {
-      return { canSend: false, reason: `Limite par seconde (${rateLimits.perSecond}) atteinte` };
+    if (perSecond && this.sendCounts.second.count >= perSecond) {
+      return { canSend: false, reason: `Limite par seconde (${perSecond}) atteinte` };
     }
-    if (rateLimits.perMinute && this.sendCounts.minute.count >= rateLimits.perMinute) {
-      return { canSend: false, reason: `Limite par minute (${rateLimits.perMinute}) atteinte` };
+    if (perMinute && this.sendCounts.minute.count >= perMinute) {
+      return { canSend: false, reason: `Limite par minute (${perMinute}) atteinte` };
     }
-    if (rateLimits.perHour && this.sendCounts.hour.count >= rateLimits.perHour) {
-      return { canSend: false, reason: `Limite par heure (${rateLimits.perHour}) atteinte` };
+    if (perHour && this.sendCounts.hour.count >= perHour) {
+      return { canSend: false, reason: `Limite par heure (${perHour}) atteinte` };
     }
-    if (rateLimits.perDay && this.sendCounts.day.count >= rateLimits.perDay) {
-      return { canSend: false, reason: `Limite par jour (${rateLimits.perDay}) atteinte` };
+    if (perDay && this.sendCounts.day.count >= perDay) {
+      return { canSend: false, reason: `Limite par jour (${perDay}) atteinte` };
     }
-    if (rateLimits.maxTotal && this.sendCounts.total >= rateLimits.maxTotal) {
-      return { canSend: false, reason: `Limite totale (${rateLimits.maxTotal}) atteinte` };
+    if (dailyQuota && this.sendCounts.total >= dailyQuota) {
+      return { canSend: false, reason: `Quota journalier (${dailyQuota}) atteint` };
     }
 
     return { canSend: true };
@@ -156,36 +163,26 @@ export class AwsSesService extends SmtpService {
   }
 
   // Obtient le prochain expéditeur selon la stratégie de rotation
-  private getNextSender(): SmtpSender | null {
-    // Si aucun expéditeur n'est défini ou si la rotation est désactivée, retourner null
-    if (!this.provider.senders || this.provider.senders.length === 0 || !this.provider.senderRotationEnabled) {
-      return null;
-    }
-
-    // Filtrer les expéditeurs actifs
-    const activeSenders = this.provider.senders.filter(sender => sender.isActive);
-    if (activeSenders.length === 0) {
-      return null;
-    }
-
-    // Sélectionner le prochain expéditeur selon la stratégie de rotation
-    let sender: SmtpSender;
-
-    if (this.provider.senderRotationType === 'random') {
-      // Sélection aléatoire
-      const randomIndex = Math.floor(Math.random() * activeSenders.length);
-      sender = activeSenders[randomIndex];
-    } else {
-      // Sélection séquentielle (par défaut)
-      if (this.senderIndex >= activeSenders.length) {
-        this.senderIndex = 0;
+  private getNextSender(options: EmailOptions): { name: string, email: string } {
+    // Utiliser directement les informations de l'expéditeur depuis les options d'envoi
+    if (typeof options.from === 'string') {
+      const match = options.from.match(/(.*?)\s*<(.+?)>/);
+      if (match) {
+        return {
+          name: match[1].trim(),
+          email: match[2].trim()
+        };
       }
-      sender = activeSenders[this.senderIndex];
-      this.senderIndex++;
+      return {
+        name: '',
+        email: options.from
+      };
+    } else {
+      return {
+        name: options.from.name,
+        email: options.from.email
+      };
     }
-
-    console.log(`⚠️ Rotation d'expéditeur - Utilisation de: ${sender.name} <${sender.email}>`);
-    return sender;
   }
 
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
@@ -202,20 +199,9 @@ export class AwsSesService extends SmtpService {
       // Convertir 'to' en tableau si c'est une chaîne
       const toAddresses = Array.isArray(options.to) ? options.to : [options.to];
       
-      // Préparer l'expéditeur en tenant compte de la rotation
-      let source: string;
-      const nextSender = this.getNextSender();
-      
-      if (nextSender) {
-        // Utiliser l'expéditeur obtenu par rotation
-        source = `${nextSender.name} <${nextSender.email}>`;
-      } else if (typeof options.from === 'string') {
-        // Utiliser l'expéditeur fourni dans les options
-        source = options.from;
-      } else {
-        // Utiliser l'expéditeur fourni dans les options (format objet)
-        source = `${options.from.name} <${options.from.email}>`;
-      }
+      // Préparer l'expéditeur
+      const sender = this.getNextSender(options);
+      const source = `${sender.name} <${sender.email}>`;
       
       console.log(`⚠️ Envoi d'email - De: ${source}`);
 
