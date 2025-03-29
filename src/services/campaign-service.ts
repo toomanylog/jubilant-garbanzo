@@ -10,7 +10,6 @@ import {
 import { createSmtpService, EmailOptions } from './smtp-service';
 import { TemplateService } from './template-service';
 import { SmtpProviderService } from './smtp-provider-service';
-import { dynamoDB } from '../models/dynamodb';
 import AWS from 'aws-sdk';
 
 // Initialiser DynamoDB

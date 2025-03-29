@@ -1,4 +1,4 @@
-import { EmailTemplate } from '../models/dynamodb';
+import { EmailTemplate, getEmailTemplateById } from '../models/dynamodb';
 
 /**
  * Service pour gérer les templates email et les variables dynamiques
@@ -119,5 +119,47 @@ export class TemplateService {
       console.error("Erreur lors du calcul du nombre total de templates:", error);
       return 0;
     }
+  }
+
+  /**
+   * Récupère un template par son ID
+   * @param templateId ID du template
+   * @returns Le template ou null s'il n'existe pas
+   */
+  static async getTemplate(templateId: string): Promise<EmailTemplate | null> {
+    try {
+      return await getEmailTemplateById(templateId);
+    } catch (error) {
+      console.error(`Erreur lors de la récupération du template ${templateId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Prépare un template en y injectant les variables
+   * @param template Le template à préparer
+   * @param variables Les variables à injecter
+   * @returns Le contenu du template avec les variables injectées
+   */
+  static prepareTemplate(template: EmailTemplate, variables: Record<string, string>) {
+    let html = template.html;
+    let text = template.text || '';
+    let subject = template.subject;
+    
+    // Remplacer toutes les variables dans le contenu HTML, texte et sujet
+    Object.entries(variables).forEach(([key, value]) => {
+      const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+      html = html.replace(regex, value);
+      text = text.replace(regex, value);
+      subject = subject.replace(regex, value);
+    });
+    
+    // Supprimer les variables non remplacées
+    const cleanupRegex = /{{(\s*[\w\.]+\s*)}}/g;
+    html = html.replace(cleanupRegex, '');
+    text = text.replace(cleanupRegex, '');
+    subject = subject.replace(cleanupRegex, '');
+    
+    return { html, text, subject };
   }
 } 

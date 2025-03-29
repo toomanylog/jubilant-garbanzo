@@ -1,3 +1,5 @@
+import { getSmtpProviderById, SmtpProvider } from '../models/dynamodb';
+
 /**
  * Service pour gérer les fournisseurs SMTP
  */
@@ -12,6 +14,20 @@ export class SmtpProviderService {
     } catch (error) {
       console.error("Erreur lors du calcul du nombre total de fournisseurs SMTP:", error);
       return 0;
+    }
+  }
+
+  /**
+   * Récupère un fournisseur SMTP par son ID
+   * @param providerId ID du fournisseur
+   * @returns Le fournisseur SMTP ou null s'il n'existe pas
+   */
+  static async getSmtpProvider(providerId: string): Promise<SmtpProvider | null> {
+    try {
+      return await getSmtpProviderById(providerId);
+    } catch (error) {
+      console.error(`Erreur lors de la récupération du fournisseur SMTP ${providerId}:`, error);
+      return null;
     }
   }
 }

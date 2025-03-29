@@ -4,14 +4,14 @@ import { SmtpProvider } from '../models/dynamodb';
 
 // Interface pour les options d'envoi d'email
 export interface EmailOptions {
-  to: string[];
+  to: string | string[];
   subject: string;
   html: string;
   text?: string;
   from: {
     email: string;
     name: string;
-  };
+  } | string;
   replyTo?: string;
   attachments?: Array<{
     filename: string;
@@ -51,10 +51,21 @@ export class AwsSesService extends SmtpService {
 
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      // Convertir 'to' en tableau si c'est une chaîne
+      const toAddresses = Array.isArray(options.to) ? options.to : [options.to];
+      
+      // Préparer l'expéditeur
+      let source: string;
+      if (typeof options.from === 'string') {
+        source = options.from;
+      } else {
+        source = `${options.from.name} <${options.from.email}>`;
+      }
+
       const params = {
-        Source: `${options.from.name} <${options.from.email}>`,
+        Source: source,
         Destination: {
-          ToAddresses: options.to
+          ToAddresses: toAddresses
         },
         ReplyToAddresses: options.replyTo ? [options.replyTo] : undefined,
         Message: {
@@ -102,19 +113,41 @@ export class SendgridService extends SmtpService {
 
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      // Convertir 'to' en tableau si c'est une chaîne
+      const toArray = Array.isArray(options.to) ? options.to : [options.to];
+      
+      // Préparer l'expéditeur
+      let fromEmail: string;
+      let fromName: string;
+      
+      if (typeof options.from === 'string') {
+        // Extraction du nom et de l'email à partir du format "Nom <email@exemple.com>"
+        const matches = options.from.match(/(.*?)\s*<(.+?)>/);
+        if (matches && matches.length === 3) {
+          fromName = matches[1].trim();
+          fromEmail = matches[2].trim();
+        } else {
+          fromName = '';
+          fromEmail = options.from.trim();
+        }
+      } else {
+        fromEmail = options.from.email;
+        fromName = options.from.name;
+      }
+
       const response = await axios.post(
         'https://api.sendgrid.com/v3/mail/send',
         {
           personalizations: [
             {
-              to: options.to.map(email => ({ email })),
+              to: toArray.map(email => ({ email })),
               subject: options.subject,
               dynamic_template_data: options.variables
             }
           ],
           from: {
-            email: options.from.email,
-            name: options.from.name
+            email: fromEmail,
+            name: fromName
           },
           reply_to: options.replyTo ? { email: options.replyTo } : undefined,
           content: [
@@ -231,6 +264,28 @@ export class MailjetService extends SmtpService {
 export class CustomSmtpService extends SmtpService {
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      // Convertir 'to' en tableau si c'est une chaîne
+      const toArray = Array.isArray(options.to) ? options.to : [options.to];
+      
+      // Préparer l'expéditeur
+      let fromEmail: string;
+      let fromName: string;
+      
+      if (typeof options.from === 'string') {
+        // Extraction du nom et de l'email à partir du format "Nom <email@exemple.com>"
+        const matches = options.from.match(/(.*?)\s*<(.+?)>/);
+        if (matches && matches.length === 3) {
+          fromName = matches[1].trim();
+          fromEmail = matches[2].trim();
+        } else {
+          fromName = '';
+          fromEmail = options.from.trim();
+        }
+      } else {
+        fromEmail = options.from.email;
+        fromName = options.from.name;
+      }
+
       // Envoi de la demande au backend
       const response = await fetch('/api/send-email', {
         method: 'POST',
@@ -247,8 +302,11 @@ export class CustomSmtpService extends SmtpService {
             requireTls: this.provider.requiresTls
           },
           emailOptions: {
-            to: options.to,
-            from: options.from,
+            to: toArray,
+            from: {
+              email: fromEmail,
+              name: fromName
+            },
             subject: options.subject,
             html: options.html,
             text: options.text,
@@ -282,6 +340,28 @@ export class CustomSmtpService extends SmtpService {
 export class Office365Service extends SmtpService {
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      // Convertir 'to' en tableau si c'est une chaîne
+      const toArray = Array.isArray(options.to) ? options.to : [options.to];
+      
+      // Préparer l'expéditeur
+      let fromEmail: string;
+      let fromName: string;
+      
+      if (typeof options.from === 'string') {
+        // Extraction du nom et de l'email à partir du format "Nom <email@exemple.com>"
+        const matches = options.from.match(/(.*?)\s*<(.+?)>/);
+        if (matches && matches.length === 3) {
+          fromName = matches[1].trim();
+          fromEmail = matches[2].trim();
+        } else {
+          fromName = '';
+          fromEmail = options.from.trim();
+        }
+      } else {
+        fromEmail = options.from.email;
+        fromName = options.from.name;
+      }
+
       // Envoi de la demande au backend
       const response = await fetch('/api/send-email', {
         method: 'POST',
@@ -298,8 +378,11 @@ export class Office365Service extends SmtpService {
             requireTls: true
           },
           emailOptions: {
-            to: options.to,
-            from: options.from,
+            to: toArray,
+            from: {
+              email: fromEmail,
+              name: fromName
+            },
             subject: options.subject,
             html: options.html,
             text: options.text,
