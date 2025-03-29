@@ -122,6 +122,20 @@ const EditSmtpProvider: React.FC = () => {
     isActive: provider.isActive ? "Actif" : "Inactif"
   });
   
+  // Vérification détaillée du provider avant de le passer au formulaire
+  console.log("⚠️ EditSmtpProvider - Provider avant passage au formulaire:", {
+    providerId: provider.providerId,
+    isDefined: !!provider,
+    isObject: typeof provider === 'object',
+    keys: Object.keys(provider),
+    containsAllRequiredProps: !!(
+      provider.providerId && 
+      provider.name && 
+      provider.providerType
+    ),
+    serialized: JSON.stringify(provider)
+  });
+  
   return (
     <Layout title="Modification du fournisseur SMTP">
       <SmtpProviderForm initialValues={provider} isEditing={true} />

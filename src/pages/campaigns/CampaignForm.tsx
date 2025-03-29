@@ -575,55 +575,6 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
                 titleTypographyProps={{ variant: 'subtitle1', className: 'font-semibold' }}
               />
               <CardContent className="p-6">
-                <TextField
-                  fullWidth
-                  id="subject"
-                  name="subject"
-                  label="Objet de l'email"
-                  variant="outlined"
-                  margin="normal"
-                  value={typeof formik.values.subject === 'string' ? formik.values.subject : ''}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={formik.touched.subject && Boolean(formik.errors.subject)}
-                  helperText={formik.touched.subject && formik.errors.subject}
-                  className="mb-4"
-                  required
-                />
-                
-                <TextField
-                  fullWidth
-                  id="fromName"
-                  name="fromName"
-                  label="Nom de l'expéditeur"
-                  variant="outlined"
-                  margin="normal"
-                  value={typeof formik.values.fromName === 'string' ? formik.values.fromName : ''}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={formik.touched.fromName && Boolean(formik.errors.fromName)}
-                  helperText={formik.touched.fromName && formik.errors.fromName}
-                  className="mb-4"
-                  required
-                />
-                
-                <TextField
-                  fullWidth
-                  id="fromEmail"
-                  name="fromEmail"
-                  label="Email de l'expéditeur"
-                  variant="outlined"
-                  margin="normal"
-                  type="email"
-                  value={typeof formik.values.fromEmail === 'string' ? formik.values.fromEmail : ''}
-                  onChange={formik.handleChange}
-                  onBlur={formik.handleBlur}
-                  error={formik.touched.fromEmail && Boolean(formik.errors.fromEmail)}
-                  helperText={formik.touched.fromEmail && formik.errors.fromEmail}
-                  className="mb-4"
-                  required
-                />
-                
                 <Box className="mt-6 mb-4">
                   <Typography 
                     variant="subtitle2" 
@@ -788,12 +739,16 @@ jane.doe@exemple.com"
             multiline
             rows={4}
             variant="outlined"
+            error={formik.touched.subject && Boolean(formik.errors.subject)}
+            helperText={(formik.touched.subject && formik.errors.subject) || "Entrez un sujet par ligne pour utiliser plusieurs sujets"}
             value={Array.isArray(formik.values.subject) ? formik.values.subject.join('\n') : formik.values.subject}
             onChange={(e) => {
-              const subjects = e.target.value.split('\n').filter(subject => subject.trim().length > 0);
+              const text = e.target.value;
+              const subjects = text.split('\n').filter(subject => subject.trim().length > 0);
+              console.log("⚠️ Valeurs sujets après split:", subjects);
               formik.setFieldValue('subject', subjects.length > 1 ? subjects : subjects[0] || '');
             }}
-            helperText="Entrez un sujet par ligne pour utiliser plusieurs sujets"
+            required
           />
         </Grid>
       </Grid>
@@ -812,12 +767,16 @@ jane.doe@exemple.com"
             multiline
             rows={4}
             variant="outlined"
+            error={formik.touched.fromName && Boolean(formik.errors.fromName)}
+            helperText={(formik.touched.fromName && formik.errors.fromName) || "Entrez un nom d'expéditeur par ligne pour utiliser plusieurs noms"}
             value={Array.isArray(formik.values.fromName) ? formik.values.fromName.join('\n') : formik.values.fromName}
             onChange={(e) => {
-              const names = e.target.value.split('\n').filter(name => name.trim().length > 0);
+              const text = e.target.value;
+              const names = text.split('\n').filter(name => name.trim().length > 0);
+              console.log("⚠️ Valeurs noms après split:", names);
               formik.setFieldValue('fromName', names.length > 1 ? names : names[0] || '');
             }}
-            helperText="Entrez un nom d'expéditeur par ligne pour utiliser plusieurs noms"
+            required
           />
         </Grid>
         <Grid item xs={12} sm={6}>
@@ -829,12 +788,16 @@ jane.doe@exemple.com"
             multiline
             rows={4}
             variant="outlined"
+            error={formik.touched.fromEmail && Boolean(formik.errors.fromEmail)}
+            helperText={(formik.touched.fromEmail && formik.errors.fromEmail) || "Entrez un email d'expéditeur par ligne pour utiliser plusieurs emails"}
             value={Array.isArray(formik.values.fromEmail) ? formik.values.fromEmail.join('\n') : formik.values.fromEmail}
             onChange={(e) => {
-              const emails = e.target.value.split('\n').filter(email => email.trim().length > 0);
+              const text = e.target.value;
+              const emails = text.split('\n').filter(email => email.trim().length > 0);
+              console.log("⚠️ Valeurs emails après split:", emails);
               formik.setFieldValue('fromEmail', emails.length > 1 ? emails : emails[0] || '');
             }}
-            helperText="Entrez un email d'expéditeur par ligne pour utiliser plusieurs emails"
+            required
           />
         </Grid>
       </Grid>

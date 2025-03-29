@@ -108,8 +108,24 @@ const SmtpProviderForm: React.FC<SmtpProviderFormProps> = ({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
-  // Pour debugger les valeurs initiales
+  // Améliorer le logging initialValues
   console.log('⚠️ DEBUG SmtpProviderForm - initialValues:', initialValues);
+  console.log('⚠️ DEBUG SmtpProviderForm - initialValues type:', typeof initialValues);
+  console.log('⚠️ DEBUG SmtpProviderForm - initialValues keys:', initialValues ? Object.keys(initialValues) : 'null');
+  
+  // Ajouter un useEffect immédiat pour tester la réception des props
+  useEffect(() => {
+    console.log('⚠️ DEBUG SmtpProviderForm - useEffect initialValues:', initialValues);
+    console.log('⚠️ DEBUG SmtpProviderForm - isEditing:', isEditing);
+    
+    if (initialValues) {
+      console.log('⚠️ DEBUG SmtpProviderForm - initialValues présent dans useEffect:', {
+        name: initialValues.name,
+        providerId: initialValues.providerId,
+        type: initialValues.providerType
+      });
+    }
+  }, [initialValues, isEditing]);
 
   // Valeurs par défaut du formulaire
   const defaultValues = {
