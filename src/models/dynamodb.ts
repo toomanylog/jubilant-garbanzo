@@ -200,13 +200,32 @@ export const getEmailTemplatesByUserId = async (userId: string): Promise<EmailTe
 };
 
 export const createEmailTemplate = async (template: EmailTemplate): Promise<boolean> => {
+  console.log('⚠️ DEBUG createEmailTemplate - template:', JSON.stringify({
+    ...template,
+    htmlContent: template.htmlContent ? `[${template.htmlContent.length} caractères]` : 'null'
+  }));
+
+  // Vérifier que le htmlContent n'est pas vide
+  if (!template.htmlContent) {
+    console.error('⚠️ ERROR createEmailTemplate: htmlContent est vide');
+  }
+
   const params = {
     TableName: 'EmailTemplates',
     Item: template
   };
 
+  console.log('⚠️ DEBUG createEmailTemplate - params:', JSON.stringify({
+    ...params,
+    Item: {
+      ...params.Item,
+      htmlContent: params.Item.htmlContent ? `[${params.Item.htmlContent.length} caractères]` : 'null'
+    }
+  }));
+
   try {
     await dynamoDB.put(params).promise();
+    console.log('⚠️ DEBUG createEmailTemplate - Opération réussie');
     return true;
   } catch (error) {
     console.error('Erreur lors de la création du template:', error);
@@ -216,13 +235,32 @@ export const createEmailTemplate = async (template: EmailTemplate): Promise<bool
 
 // Mettre à jour un template d'email existant
 export const updateEmailTemplate = async (template: EmailTemplate): Promise<boolean> => {
+  console.log('⚠️ DEBUG updateEmailTemplate - template:', JSON.stringify({
+    ...template,
+    htmlContent: template.htmlContent ? `[${template.htmlContent.length} caractères]` : 'null'
+  }));
+
+  // Vérifier que le htmlContent n'est pas vide
+  if (!template.htmlContent) {
+    console.error('⚠️ ERROR updateEmailTemplate: htmlContent est vide');
+  }
+
   const params = {
     TableName: 'EmailTemplates',
     Item: template
   };
 
+  console.log('⚠️ DEBUG updateEmailTemplate - params:', JSON.stringify({
+    ...params,
+    Item: {
+      ...params.Item,
+      htmlContent: params.Item.htmlContent ? `[${params.Item.htmlContent.length} caractères]` : 'null'
+    }
+  }));
+
   try {
     await dynamoDB.put(params).promise();
+    console.log('⚠️ DEBUG updateEmailTemplate - Opération réussie');
     return true;
   } catch (error) {
     console.error('Erreur lors de la mise à jour du template:', error);
@@ -391,13 +429,24 @@ export const updateSmtpProvider = async (provider: SmtpProvider): Promise<boolea
 // Supprime un fournisseur SMTP
 export const deleteSmtpProvider = async (providerId: string): Promise<boolean> => {
   try {
-    // Dans une vraie implémentation, on appellerait l'API DynamoDB
-    console.log(`Suppression du fournisseur SMTP avec l'ID: ${providerId}`);
+    console.log(`⚠️ DEBUG deleteSmtpProvider - Suppression du fournisseur avec ID: ${providerId}`);
     
-    // Simulation d'une réponse réussie
+    // Appeler réellement l'API DynamoDB pour supprimer le fournisseur
+    const params = {
+      TableName: 'SmtpProviders',
+      Key: {
+        providerId: providerId
+      }
+    };
+    
+    console.log('⚠️ DEBUG deleteSmtpProvider - params:', JSON.stringify(params));
+    
+    await dynamoDB.delete(params).promise();
+    console.log('⚠️ DEBUG deleteSmtpProvider - Suppression réussie');
+    
     return true;
   } catch (error) {
-    console.error('Erreur lors de la suppression du fournisseur SMTP:', error);
+    console.error('⚠️ ERROR deleteSmtpProvider:', error);
     return false;
   }
 }; 

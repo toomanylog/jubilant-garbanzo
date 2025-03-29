@@ -35,26 +35,28 @@ const SmtpProviderList: React.FC = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [providers, setProviders] = useState<SmtpProvider[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [providerToDelete, setProviderToDelete] = useState<string | null>(null);
+  const [providerToDelete, setProviderToDelete] = useState<SmtpProvider | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const fetchProviders = async () => {
+    if (!currentUser) return;
+    
+    try {
+      setLoading(true);
+      const providersData = await getSmtpProvidersByUserId(currentUser.userId);
+      setProviders(providersData);
+    } catch (err: any) {
+      console.error('Erreur lors du chargement des fournisseurs SMTP:', err);
+      setError(err.message || 'Une erreur est survenue lors du chargement des fournisseurs SMTP');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchProviders = async () => {
-      if (!currentUser) return;
-      
-      try {
-        const userProviders = await getSmtpProvidersByUserId(currentUser.userId);
-        setProviders(userProviders);
-      } catch (err: any) {
-        console.error('Erreur lors de la récupération des fournisseurs SMTP:', err);
-        setError(err.message || 'Une erreur est survenue');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
     fetchProviders();
   }, [currentUser]);
 
@@ -96,32 +98,48 @@ const SmtpProviderList: React.FC = () => {
     navigate(`/smtp-providers/${providerId}`);
   };
 
-  const handleDeleteConfirm = (providerId: string) => {
-    setProviderToDelete(providerId);
+  const handleDeleteClick = (provider: SmtpProvider) => {
+    setProviderToDelete(provider);
     setDeleteDialogOpen(true);
   };
 
-  const handleDeleteProvider = async () => {
-    if (!providerToDelete) return;
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setProviderToDelete(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    setIsDeleting(true);
+    
+    console.log('⚠️ DEBUG SmtpProviderList - Suppression du fournisseur:', providerToDelete);
     
     try {
-      const success = await deleteSmtpProvider(providerToDelete);
-      if (success) {
-        setProviders(providers.filter(p => p.providerId !== providerToDelete));
-        toast.success('Fournisseur SMTP supprimé avec succès');
-      } else {
-        toast.error('Erreur lors de la suppression du fournisseur SMTP');
+      if (providerToDelete) {
+        const result = await deleteSmtpProvider(providerToDelete.providerId);
+        console.log('⚠️ DEBUG SmtpProviderList - Résultat de la suppression:', result);
+        
+        if (result) {
+          // Mettre à jour la liste après la suppression
+          setProviders(providers.filter(provider => provider.providerId !== providerToDelete.providerId));
+          toast.success('Fournisseur SMTP supprimé avec succès');
+        } else {
+          toast.error('Erreur lors de la suppression du fournisseur SMTP');
+        }
       }
-    } catch (err: any) {
-      console.error('Erreur lors de la suppression du fournisseur SMTP:', err);
-      toast.error(err.message || 'Une erreur est survenue');
+    } catch (error) {
+      console.error('Erreur lors de la suppression du fournisseur SMTP:', error);
+      toast.error('Erreur lors de la suppression du fournisseur SMTP');
     } finally {
       setDeleteDialogOpen(false);
       setProviderToDelete(null);
+      setIsDeleting(false);
+      
+      // Recharger la liste pour s'assurer qu'elle est à jour
+      fetchProviders();
     }
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <Layout title="Fournisseurs SMTP">
         <Box className="flex justify-center items-center h-[50vh]">
@@ -283,7 +301,7 @@ const SmtpProviderList: React.FC = () => {
                             color="error"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteConfirm(provider.providerId);
+                              handleDeleteClick(provider);
                             }}
                             size="small"
                             className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
@@ -303,7 +321,7 @@ const SmtpProviderList: React.FC = () => {
         {/* Boîte de dialogue de confirmation de suppression */}
         <Dialog
           open={deleteDialogOpen}
-          onClose={() => setDeleteDialogOpen(false)}
+          onClose={handleDeleteCancel}
           maxWidth="sm"
           fullWidth
           PaperProps={{
@@ -318,13 +336,13 @@ const SmtpProviderList: React.FC = () => {
           </DialogContent>
           <DialogActions className="p-4">
             <Button 
-              onClick={() => setDeleteDialogOpen(false)}
+              onClick={handleDeleteCancel}
               className="text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
             >
               Annuler
             </Button>
             <Button 
-              onClick={handleDeleteProvider} 
+              onClick={handleDeleteConfirm} 
               color="error" 
               variant="contained"
               autoFocus

@@ -154,14 +154,27 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
         
         // S'assurer que le contenu HTML est correctement formaté
         console.log('⚠️ DEBUG TemplateForm - Contenu HTML envoyé:', values.htmlContent?.substring(0, 100) + '...');
+        console.log('⚠️ DEBUG TemplateForm - Taille du contenu HTML:', values.htmlContent?.length || 0);
         
+        // Créer une copie explicite des valeurs pour s'assurer que tout est bien transmis
         const templateData: EmailTemplate = {
-          ...values,
+          name: values.name,
+          subject: values.subject,
+          fromName: values.fromName,
+          fromEmail: values.fromEmail,
+          htmlContent: values.htmlContent || '<p>Contenu par défaut</p>', // S'assurer qu'il y a toujours du contenu
+          textContent: values.textContent || '',
           userId: currentUser.userId,
           templateId: initialValues?.templateId || uuidv4(),
           createdAt: initialValues?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
+        
+        // Afficher l'objet complet pour débogage
+        console.log('⚠️ DEBUG TemplateForm - templateData complet:',  JSON.stringify({
+          ...templateData,
+          htmlContent: templateData.htmlContent ? `[${templateData.htmlContent.length} caractères]` : 'null'
+        }));
         
         if (isEditing) {
           await updateEmailTemplate(templateData);
