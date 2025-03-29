@@ -104,7 +104,7 @@ export interface EmailCampaign {
   createdAt: string;
   updatedAt: string;
   stats: EmailCampaignStats;
-  content?: string; // Ajout du champ content optionnel pour stocker le contenu personnalisé
+  content?: string; // Champ optionnel pour le contenu personnalisé
   // Options de rotation
   rotationOptions?: {
     templateRotation: 'sequential' | 'random';

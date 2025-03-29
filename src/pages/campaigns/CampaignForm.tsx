@@ -115,22 +115,37 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   // Schéma de validation Yup
   const validationSchema = Yup.object({
     name: Yup.string().required('Le nom de la campagne est requis'),
-    subject: Yup.mixed().required('Le sujet est requis'),
-    templateId: Yup.mixed().required('Un template est requis'),
-    smtpProviderId: Yup.mixed().required('Un fournisseur SMTP est requis'),
-    fromName: Yup.mixed().required('Le nom d\'expéditeur est requis'),
-    fromEmail: Yup.mixed().test(
-      'valid-email',
-      'Email invalide',
-      function(value) {
-        if (typeof value === 'string') {
-          return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-        } else if (Array.isArray(value)) {
-          return value.every(email => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
-        }
-        return false;
+    subject: Yup.lazy(value => 
+      Array.isArray(value)
+        ? Yup.array().of(Yup.string()).min(1, 'Au moins un sujet est requis')
+        : Yup.string().required('Le sujet est requis')
+    ),
+    templateId: Yup.lazy(value => 
+      Array.isArray(value)
+        ? Yup.array().of(Yup.string()).min(1, 'Au moins un template est requis')
+        : Yup.string().required('Un template est requis')
+    ),
+    smtpProviderId: Yup.lazy(value => 
+      Array.isArray(value)
+        ? Yup.array().of(Yup.string()).min(1, 'Au moins un fournisseur SMTP est requis')
+        : Yup.string().required('Un fournisseur SMTP est requis')
+    ),
+    fromName: Yup.lazy(value => 
+      Array.isArray(value)
+        ? Yup.array().of(Yup.string()).min(1, 'Au moins un nom d\'expéditeur est requis')
+        : Yup.string().required('Le nom d\'expéditeur est requis')
+    ),
+    fromEmail: Yup.lazy(value => {
+      if (Array.isArray(value)) {
+        return Yup.array()
+          .of(Yup.string().email('Email invalide'))
+          .min(1, 'Au moins un email d\'expéditeur est requis');
+      } else {
+        return Yup.string()
+          .email('Email invalide')
+          .required('L\'email d\'expéditeur est requis');
       }
-    ).required('L\'email d\'expéditeur est requis'),
+    }),
     recipients: Yup.string().required('La liste des destinataires est requise')
   });
 
@@ -767,14 +782,16 @@ jane.doe@exemple.com"
             value={Array.isArray(formik.values.subject) ? formik.values.subject.join('\n') : formik.values.subject}
             onChange={(e) => {
               const text = e.target.value;
+              // Diviser le texte en lignes et filtrer les lignes vides
               const subjects = text.split('\n').filter(subject => subject.trim().length > 0);
               console.log("⚠️ Valeurs sujets après split:", subjects);
-              formik.setFieldValue('subject', subjects.length > 1 ? subjects : subjects[0] || '');
-            }}
-            onKeyDown={(e) => {
-              // Ne pas empêcher l'événement par défaut pour la touche Entrée
-              if (e.key === 'Enter') {
-                e.stopPropagation(); // Empêche la soumission du formulaire
+              
+              // Stocker toujours comme chaîne unique si un seul élément
+              if (subjects.length <= 1) {
+                formik.setFieldValue('subject', subjects[0] || '');
+              } else {
+                // Stocker comme tableau si plusieurs éléments
+                formik.setFieldValue('subject', subjects);
               }
             }}
             required
@@ -801,14 +818,16 @@ jane.doe@exemple.com"
             value={Array.isArray(formik.values.fromName) ? formik.values.fromName.join('\n') : formik.values.fromName}
             onChange={(e) => {
               const text = e.target.value;
+              // Diviser le texte en lignes et filtrer les lignes vides
               const names = text.split('\n').filter(name => name.trim().length > 0);
               console.log("⚠️ Valeurs noms après split:", names);
-              formik.setFieldValue('fromName', names.length > 1 ? names : names[0] || '');
-            }}
-            onKeyDown={(e) => {
-              // Ne pas empêcher l'événement par défaut pour la touche Entrée
-              if (e.key === 'Enter') {
-                e.stopPropagation(); // Empêche la soumission du formulaire
+              
+              // Stocker toujours comme chaîne unique si un seul élément
+              if (names.length <= 1) {
+                formik.setFieldValue('fromName', names[0] || '');
+              } else {
+                // Stocker comme tableau si plusieurs éléments
+                formik.setFieldValue('fromName', names);
               }
             }}
             required
@@ -828,14 +847,16 @@ jane.doe@exemple.com"
             value={Array.isArray(formik.values.fromEmail) ? formik.values.fromEmail.join('\n') : formik.values.fromEmail}
             onChange={(e) => {
               const text = e.target.value;
+              // Diviser le texte en lignes et filtrer les lignes vides
               const emails = text.split('\n').filter(email => email.trim().length > 0);
               console.log("⚠️ Valeurs emails après split:", emails);
-              formik.setFieldValue('fromEmail', emails.length > 1 ? emails : emails[0] || '');
-            }}
-            onKeyDown={(e) => {
-              // Ne pas empêcher l'événement par défaut pour la touche Entrée
-              if (e.key === 'Enter') {
-                e.stopPropagation(); // Empêche la soumission du formulaire
+              
+              // Stocker toujours comme chaîne unique si un seul élément
+              if (emails.length <= 1) {
+                formik.setFieldValue('fromEmail', emails[0] || '');
+              } else {
+                // Stocker comme tableau si plusieurs éléments
+                formik.setFieldValue('fromEmail', emails);
               }
             }}
             required
