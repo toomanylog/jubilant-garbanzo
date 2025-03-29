@@ -77,6 +77,18 @@ Resources:
           Projection:
             ProjectionType: ALL
 
+  UserSettingsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: UserSettings
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+
 Outputs:
   UsersTableArn:
     Description: ARN de la table Users
@@ -92,4 +104,8 @@ Outputs:
   
   EmailCampaignsTableArn:
     Description: ARN de la table EmailCampaigns
-    Value: !GetAtt EmailCampaignsTable.Arn 
+    Value: !GetAtt EmailCampaignsTable.Arn
+    
+  UserSettingsTableArn:
+    Description: ARN de la table UserSettings
+    Value: !GetAtt UserSettingsTable.Arn 

@@ -74,6 +74,7 @@ export class AwsSesService extends SmtpService {
     this.ses = new AWS.SES({
       region: region,
       credentials: credentials,
+      endpoint: `email-smtp.${region}.amazonaws.com`,
       // Ne pas définir d'endpoint personnalisé pour permettre à AWS SDK de choisir le bon endpoint basé sur la région
       // Cela évite les erreurs de signature
     });

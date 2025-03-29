@@ -125,6 +125,22 @@ export const createUser = async (user: User): Promise<boolean> => {
   }
 };
 
+// Fonction pour mettre à jour un utilisateur existant
+export const updateUser = async (user: User): Promise<boolean> => {
+  const params = {
+    TableName: 'Users',
+    Item: user
+  };
+
+  try {
+    await dynamoDB.put(params).promise();
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour de l\'utilisateur:', error);
+    return false;
+  }
+};
+
 // Alias de getUserById pour la compatibilité
 export const getUser = getUserById;
 

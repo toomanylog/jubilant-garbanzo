@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
-import { LayoutDashboard, BarChart, Settings, Package, Mail, LogOut, Menu, X, Eye, User } from 'lucide-react';
+import { BarChart, Settings, Package, Mail, LogOut, Menu, X, Eye, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 
@@ -18,7 +18,6 @@ const Navbar: React.FC = () => {
   };
 
   const menuItems = [
-    { name: 'Tableau de bord', path: '/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { name: 'Campagnes', path: '/campaigns', icon: <BarChart className="w-5 h-5" /> },
     { name: 'Templates', path: '/templates', icon: <Package className="w-5 h-5" /> },
     { name: 'SMTP', path: '/smtp-providers', icon: <Mail className="w-5 h-5" /> },
@@ -69,19 +68,13 @@ const Navbar: React.FC = () => {
             <div className="flex items-center space-x-3">
               {isAuthenticated ? (
                 <>
-                  <div className="flex items-center mr-4">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary mr-2">
-                      <User className="h-4 w-4" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                        {currentUser?.fullName}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {currentUser?.email}
-                      </span>
-                    </div>
-                  </div>
+                  <Link 
+                    to="/profile"
+                    className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                    title={currentUser?.fullName || "Profil"}
+                  >
+                    <User className="h-5 w-5" />
+                  </Link>
                   <Button
                     variant="outline"
                     size="sm"
@@ -119,7 +112,16 @@ const Navbar: React.FC = () => {
           </div>
           
           {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
+          <div className="md:hidden flex items-center space-x-2">
+            {isAuthenticated && (
+              <Link 
+                to="/profile"
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                title={currentUser?.fullName || "Profil"}
+              >
+                <User className="h-5 w-5" />
+              </Link>
+            )}
             <button
               onClick={toggleMenu}
               className="inline-flex items-center justify-center rounded-md p-2 text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary dark:text-gray-200 dark:hover:bg-gray-800"
@@ -139,24 +141,6 @@ const Navbar: React.FC = () => {
       {isMenuOpen && (
         <div className="md:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
           <div className="space-y-1 p-3 pb-6">
-            {isAuthenticated && (
-              <div className="px-4 py-3 mb-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                    <User className="h-5 w-5" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {currentUser?.fullName}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {currentUser?.email}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-            
             {isAuthenticated ? (
               <>
                 {menuItems.map((item) => (
