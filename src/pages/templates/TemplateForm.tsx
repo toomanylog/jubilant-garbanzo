@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -13,8 +13,6 @@ import {
   CardHeader,
   useTheme,
   useMediaQuery,
-  InputAdornment,
-  IconButton,
   Tab,
   Tabs
 } from '@mui/material';
@@ -26,14 +24,6 @@ import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
 import CodeIcon from '@mui/icons-material/Code';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { Controlled as CodeMirror } from 'react-codemirror2';
-
-import 'codemirror/lib/codemirror.css';
-import 'codemirror/theme/material.css';
-import 'codemirror/mode/htmlmixed/htmlmixed';
-import 'codemirror/mode/xml/xml';
-import 'codemirror/mode/javascript/javascript';
-import 'codemirror/mode/css/css';
 
 import Layout from '../../components/layout/Layout';
 import { useAuth } from '../../contexts/AuthContext';
@@ -47,11 +37,6 @@ import {
 interface TemplateFormProps {
   initialValues?: EmailTemplate;
   isEditing?: boolean;
-}
-
-// Typages pour CodeMirror
-interface EditorChangeHandler {
-  (editor: any, data: any, value: string): void;
 }
 
 const TemplateForm: React.FC<TemplateFormProps> = ({ 
@@ -324,29 +309,22 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
           </Box>
           
           <Box sx={{ p: 3, minHeight: '400px' }} hidden={activeTab !== 0}>
-            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, height: '100%', minHeight: '400px' }}>
-              <CodeMirror
-                value={formik.values.htmlContent}
-                options={{
-                  mode: 'htmlmixed',
-                  theme: 'material',
-                  lineNumbers: true,
-                  lineWrapping: true
-                }}
-                onBeforeChange={(editor: any, data: any, value: string) => {
-                  formik.setFieldValue('htmlContent', value);
-                }}
-                onChange={(editor: any, data: any, value: string) => {
-                  // Mise à jour en temps réel lors de la modification
-                }}
-                className="h-full"
-              />
-            </Box>
-            {formik.touched.htmlContent && formik.errors.htmlContent && (
-              <Typography color="error" variant="caption" sx={{ mt: 1 }}>
-                {formik.errors.htmlContent}
-              </Typography>
-            )}
+            <TextField
+              fullWidth
+              id="htmlContent"
+              name="htmlContent"
+              label="Code HTML du template"
+              multiline
+              rows={20}
+              value={formik.values.htmlContent}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur}
+              error={formik.touched.htmlContent && Boolean(formik.errors.htmlContent)}
+              helperText={formik.touched.htmlContent && formik.errors.htmlContent}
+              variant="outlined"
+              className="rounded-md mb-4 font-mono"
+              placeholder="Entrez votre code HTML ici..."
+            />
           </Box>
         </Card>
         
