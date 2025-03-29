@@ -46,6 +46,9 @@ interface Campaign {
   updatedAt: number;
   errorMessage?: string;
   stats: CampaignStats;
+  subject?: string;
+  fromName?: string;
+  fromEmail?: string;
 }
 
 /**
@@ -153,7 +156,7 @@ export class CampaignService {
         const sendPromises = batch.map(async (recipient: Recipient) => {
           try {
             // Personnalisation du contenu HTML
-            const personalizedHtml = this.personalizeContent(template.html, {
+            const personalizedHtml = this.personalizeContent(template.htmlContent, {
               firstName: recipient.firstName || '',
               lastName: recipient.lastName || '',
               email: recipient.email,
@@ -171,11 +174,14 @@ export class CampaignService {
             // Envoi de l'email
             const result = await smtpService.sendEmail({
               to: recipient.email,
-              from: `${template.senderName} <${template.senderEmail}>`,
+              from: {
+                email: campaign.fromEmail || 'noreply@example.com',
+                name: campaign.fromName || 'North Eyes'
+              },
               subject: personalizedSubject,
               html: personalizedHtml,
               text: this.htmlToText(personalizedHtml),
-              replyTo: template.replyToEmail || template.senderEmail,
+              replyTo: campaign.fromEmail,
               variables: recipient.variables
             });
 
@@ -541,7 +547,7 @@ export class CampaignService {
       const campaign = await this.getCampaign(campaignId);
       if (!campaign) return false;
       
-      const updateParams: AWS.DynamoDB.DocumentClient.UpdateItemInput = {
+      const updateParams = {
         TableName: 'Campaigns',
         Key: { id: campaignId },
         UpdateExpression: 'SET #status = :status, updatedAt = :updatedAt',
@@ -583,7 +589,7 @@ export class CampaignService {
     stats: Partial<CampaignStats>
   ): Promise<boolean> {
     try {
-      const updateParams: AWS.DynamoDB.DocumentClient.UpdateItemInput = {
+      const updateParams = {
         TableName: 'Campaigns',
         Key: { id: campaignId },
         UpdateExpression: 'SET updatedAt = :updatedAt',
