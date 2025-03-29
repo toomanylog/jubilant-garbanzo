@@ -9,5 +9,9 @@
   "dependencies": {
     "aws-sdk": "^2.1467.0",
     "uuid": "^9.0.0"
-  }
-} 
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
