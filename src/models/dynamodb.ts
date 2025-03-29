@@ -239,11 +239,26 @@ export const getEmailTemplateById = async (templateId: string): Promise<EmailTem
     }
   };
 
+  console.log('⚠️ DEBUG getEmailTemplateById - templateId:', templateId);
+  console.log('⚠️ DEBUG getEmailTemplateById - params:', JSON.stringify(params));
+
   try {
     const result = await dynamoDB.get(params).promise();
-    return result.Item as EmailTemplate || null;
+    console.log('⚠️ DEBUG getEmailTemplateById - result:', JSON.stringify(result));
+    
+    if (!result.Item) {
+      console.log('⚠️ DEBUG getEmailTemplateById - Template non trouvé');
+      return null;
+    }
+    
+    // Vérifions si le contenu HTML est présent
+    const template = result.Item as EmailTemplate;
+    console.log('⚠️ DEBUG getEmailTemplateById - htmlContent présent:', !!template.htmlContent);
+    console.log('⚠️ DEBUG getEmailTemplateById - taille htmlContent:', template.htmlContent?.length || 0);
+    
+    return template;
   } catch (error) {
-    console.error('Erreur lors de la récupération du template:', error);
+    console.error('⚠️ ERROR getEmailTemplateById:', error);
     return null;
   }
 };

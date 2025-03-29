@@ -53,6 +53,8 @@ const TemplatePreview: React.FC = () => {
         setIsLoading(true);
         const templateData = await getEmailTemplateById(templateId);
         
+        console.log('⚠️ DEBUG TemplatePreview - templateData:', templateData);
+        
         if (!templateData) {
           setError('Template non trouvé');
           return;
@@ -68,6 +70,7 @@ const TemplatePreview: React.FC = () => {
         
         // Extraire les variables du template
         const extractedVars = TemplateService.extractVariables(templateData.htmlContent);
+        console.log('⚠️ DEBUG TemplatePreview - variables extraites:', extractedVars);
         
         // Initialiser les variables avec des valeurs de démo
         const initialVars: Record<string, string> = {};
@@ -79,6 +82,7 @@ const TemplatePreview: React.FC = () => {
         
         // Générer la prévisualisation
         const { html } = TemplateService.prepareTemplate(templateData, initialVars);
+        console.log('⚠️ DEBUG TemplatePreview - html généré:', html?.substring(0, 100) + '...');
         setPreviewHtml(html);
       } catch (err: any) {
         console.error('Erreur lors du chargement du template:', err);
@@ -158,6 +162,9 @@ const TemplatePreview: React.FC = () => {
         return '100%';
     }
   };
+
+  // Log pour déboguer le contenu HTML à afficher
+  console.log('⚠️ DEBUG TemplatePreview - rendu avec previewHtml:', previewHtml?.substring(0, 100) + '...');
 
   return (
     <Layout title={`Prévisualisation: ${template.name}`}>
