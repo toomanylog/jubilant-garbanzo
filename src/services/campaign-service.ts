@@ -523,12 +523,48 @@ export class CampaignService {
    */
   static async getCampaign(campaignId: string): Promise<Campaign | null> {
     try {
+      console.log(`Récupération de la campagne ${campaignId} depuis DynamoDB...`);
       const result = await dynamoDB.get({
-        TableName: 'Campaigns',
-        Key: { id: campaignId }
+        TableName: 'EmailCampaigns',
+        Key: { campaignId: campaignId }
       }).promise();
       
-      return (result.Item as Campaign) || null;
+      console.log(`Résultat de la récupération:`, result.Item ? 'Campagne trouvée' : 'Campagne non trouvée');
+      
+      if (!result.Item) return null;
+      
+      const emailCampaign = result.Item as EmailCampaign;
+      
+      // Conversion de EmailCampaign vers Campaign
+      const campaign: Campaign = {
+        id: emailCampaign.campaignId,
+        name: emailCampaign.name,
+        templateId: emailCampaign.templateId,
+        smtpProviderId: emailCampaign.providerId,
+        status: emailCampaign.status === 'sent' ? 'completed' : emailCampaign.status as 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed',
+        recipients: emailCampaign.recipients.map(email => ({ 
+          email, 
+          firstName: '', 
+          lastName: '',
+          variables: {}
+        })),
+        scheduledAt: emailCampaign.scheduledAt ? new Date(emailCampaign.scheduledAt).getTime() : undefined,
+        sentAt: emailCampaign.sentAt ? new Date(emailCampaign.sentAt).getTime() : undefined,
+        createdAt: new Date(emailCampaign.createdAt).getTime(),
+        updatedAt: new Date(emailCampaign.updatedAt).getTime(),
+        subject: emailCampaign.subject,
+        fromName: emailCampaign.fromName,
+        fromEmail: emailCampaign.fromEmail,
+        stats: {
+          delivered: emailCampaign.stats.delivered,
+          failed: emailCampaign.stats.bounced + (emailCampaign.stats.total - emailCampaign.stats.sent),
+          bounces: emailCampaign.stats.bounced,
+          opened: emailCampaign.stats.opened,
+          clicked: emailCampaign.stats.clicked
+        }
+      };
+      
+      return campaign;
     } catch (error) {
       console.error(`Erreur lors de la récupération de la campagne ${campaignId}:`, error);
       return null;
@@ -548,15 +584,15 @@ export class CampaignService {
       if (!campaign) return false;
       
       const updateParams = {
-        TableName: 'Campaigns',
-        Key: { id: campaignId },
+        TableName: 'EmailCampaigns',
+        Key: { campaignId: campaignId },
         UpdateExpression: 'SET #status = :status, updatedAt = :updatedAt',
         ExpressionAttributeNames: {
           '#status': 'status'
         },
         ExpressionAttributeValues: {
-          ':status': status,
-          ':updatedAt': Date.now()
+          ':status': status === 'completed' ? 'sent' : status,
+          ':updatedAt': new Date().toISOString()
         } as Record<string, any>,
         ReturnValues: 'UPDATED_NEW'
       };
@@ -570,7 +606,7 @@ export class CampaignService {
       // Ajouter la date d'envoi si le statut est 'completed'
       if (status === 'completed') {
         updateParams.UpdateExpression += ', sentAt = :sentAt';
-        updateParams.ExpressionAttributeValues[':sentAt'] = Date.now();
+        updateParams.ExpressionAttributeValues[':sentAt'] = new Date().toISOString();
       }
       
       await dynamoDB.update(updateParams).promise();
@@ -590,11 +626,11 @@ export class CampaignService {
   ): Promise<boolean> {
     try {
       const updateParams = {
-        TableName: 'Campaigns',
-        Key: { id: campaignId },
+        TableName: 'EmailCampaigns',
+        Key: { campaignId: campaignId },
         UpdateExpression: 'SET updatedAt = :updatedAt',
         ExpressionAttributeValues: {
-          ':updatedAt': Date.now()
+          ':updatedAt': new Date().toISOString()
         } as Record<string, any>,
         ReturnValues: 'UPDATED_NEW'
       };
