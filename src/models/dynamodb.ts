@@ -160,6 +160,8 @@ export const createSmtpProvider = async (provider: SmtpProvider): Promise<boolea
 
 // Obtenir un fournisseur SMTP par son ID
 export const getSmtpProviderById = async (providerId: string): Promise<SmtpProvider> => {
+  console.log('⚠️ DEBUG getSmtpProviderById - Début de la requête, providerId:', providerId);
+  
   const params = {
     TableName: 'SmtpProviders',
     Key: {
@@ -168,13 +170,20 @@ export const getSmtpProviderById = async (providerId: string): Promise<SmtpProvi
   };
 
   try {
+    console.log('⚠️ DEBUG getSmtpProviderById - Paramètres de la requête:', JSON.stringify(params));
+    
     const result = await dynamoDB.get(params).promise();
+    console.log('⚠️ DEBUG getSmtpProviderById - Résultat brut de la requête:', JSON.stringify(result));
+    
     if (!result.Item) {
+      console.error('⚠️ ERROR getSmtpProviderById - Provider non trouvé:', providerId);
       throw new Error('Fournisseur SMTP non trouvé');
     }
+    
+    console.log('⚠️ DEBUG getSmtpProviderById - Provider trouvé:', result.Item.name);
     return result.Item as SmtpProvider;
   } catch (error) {
-    console.error('Erreur lors de la récupération du fournisseur SMTP:', error);
+    console.error('⚠️ ERROR getSmtpProviderById - Erreur complète:', error);
     throw error;
   }
 };
@@ -270,6 +279,8 @@ export const updateEmailTemplate = async (template: EmailTemplate): Promise<bool
 
 // Obtenir un template d'email par son ID
 export const getEmailTemplateById = async (templateId: string): Promise<EmailTemplate | null> => {
+  console.log('⚠️ DEBUG getEmailTemplateById - Début de la requête, templateId:', templateId);
+  
   const params = {
     TableName: 'EmailTemplates',
     Key: {
@@ -277,26 +288,25 @@ export const getEmailTemplateById = async (templateId: string): Promise<EmailTem
     }
   };
 
-  console.log('⚠️ DEBUG getEmailTemplateById - templateId:', templateId);
-  console.log('⚠️ DEBUG getEmailTemplateById - params:', JSON.stringify(params));
-
   try {
+    console.log('⚠️ DEBUG getEmailTemplateById - Paramètres de la requête:', JSON.stringify(params));
+    
     const result = await dynamoDB.get(params).promise();
-    console.log('⚠️ DEBUG getEmailTemplateById - result:', JSON.stringify(result));
+    console.log('⚠️ DEBUG getEmailTemplateById - Résultat brut de la requête:', JSON.stringify(result));
     
     if (!result.Item) {
       console.log('⚠️ DEBUG getEmailTemplateById - Template non trouvé');
       return null;
     }
     
-    // Vérifions si le contenu HTML est présent
     const template = result.Item as EmailTemplate;
+    console.log('⚠️ DEBUG getEmailTemplateById - Template trouvé:', template.name);
     console.log('⚠️ DEBUG getEmailTemplateById - htmlContent présent:', !!template.htmlContent);
     console.log('⚠️ DEBUG getEmailTemplateById - taille htmlContent:', template.htmlContent?.length || 0);
     
     return template;
   } catch (error) {
-    console.error('⚠️ ERROR getEmailTemplateById:', error);
+    console.error('⚠️ ERROR getEmailTemplateById - Erreur complète:', error);
     return null;
   }
 };

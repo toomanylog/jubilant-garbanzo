@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -30,7 +30,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { 
   EmailTemplate, 
   createEmailTemplate, 
-  updateEmailTemplate
+  updateEmailTemplate,
+  getEmailTemplateById
 } from '../../models/dynamodb';
 
 // Props pour le composant
@@ -45,15 +46,15 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
 }) => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const { templateId } = useParams<{ templateId: string }>();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(!!templateId);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
-
-  // Pour debugger les valeurs initiales
-  console.log('⚠️ DEBUG TemplateForm - initialValues:', initialValues);
+  const [templateData, setTemplateData] = useState<EmailTemplate | null>(initialValues || null);
 
   // Valeurs par défaut du formulaire
   const defaultValues = {
@@ -127,6 +128,72 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     textContent: ''
   };
 
+  // Chargement du template si nous sommes en mode édition
+  useEffect(() => {
+    const fetchTemplate = async () => {
+      // Si pas d'ID de template ou si nous avons déjà des valeurs initiales, ne rien faire
+      if (!templateId || initialValues) {
+        console.log("⚠️ TemplateForm - Pas besoin de charger les données:", {
+          hasTemplateId: !!templateId,
+          hasInitialValues: !!initialValues
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log("⚠️ TemplateForm - Début du chargement du template:", templateId);
+      
+      try {
+        console.log("⚠️ TemplateForm - Appel de getEmailTemplateById avec templateId:", templateId);
+        const template = await getEmailTemplateById(templateId);
+        
+        if (!template) {
+          console.error("⚠️ TemplateForm - Template non trouvé:", templateId);
+          setError("Template non trouvé");
+          setIsLoading(false);
+          return;
+        }
+        
+        // Vérifier que le template appartient à l'utilisateur courant
+        if (template.userId !== currentUser?.userId) {
+          console.error("⚠️ TemplateForm - Le template n'appartient pas à l'utilisateur:", {
+            templateUserId: template.userId,
+            currentUserId: currentUser?.userId
+          });
+          setError("Vous n'avez pas les droits pour modifier ce template");
+          setIsLoading(false);
+          return;
+        }
+        
+        console.log("⚠️ TemplateForm - Template chargé avec succès:", template.name);
+        console.log("⚠️ TemplateForm - htmlContent présent:", !!template.htmlContent);
+        console.log("⚠️ TemplateForm - Taille du htmlContent:", template.htmlContent?.length || 0);
+        
+        // Mettre à jour l'état avec les données du template
+        setTemplateData(template);
+        
+        // Réinitialiser le formulaire avec les nouvelles valeurs
+        formik.resetForm({
+          values: {
+            name: template.name || '',
+            subject: template.subject || '',
+            fromName: template.fromName || '',
+            fromEmail: template.fromEmail || '',
+            htmlContent: template.htmlContent || '',
+            textContent: template.textContent || ''
+          }
+        });
+      } catch (err: any) {
+        console.error("⚠️ TemplateForm - Erreur lors du chargement du template:", err);
+        setError(err.message || "Une erreur est survenue lors du chargement du template");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchTemplate();
+  }, [templateId, currentUser, initialValues]);
+
   // Schéma de validation
   const validationSchema = Yup.object().shape({
     name: Yup.string().required('Le nom est requis'),
@@ -138,8 +205,9 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
 
   // Gestion du formulaire avec Formik
   const formik = useFormik({
-    initialValues: initialValues || defaultValues,
+    initialValues: templateData || defaultValues,
     validationSchema,
+    enableReinitialize: true, // Important pour permettre la mise à jour des valeurs
     onSubmit: async (values) => {
       if (!currentUser) return;
       
@@ -157,7 +225,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
         console.log('⚠️ DEBUG TemplateForm - Taille du contenu HTML:', values.htmlContent?.length || 0);
         
         // Créer une copie explicite des valeurs pour s'assurer que tout est bien transmis
-        const templateData: EmailTemplate = {
+        const newTemplateData: EmailTemplate = {
           name: values.name,
           subject: values.subject,
           fromName: values.fromName,
@@ -165,28 +233,32 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
           htmlContent: values.htmlContent || '<p>Contenu par défaut</p>', // S'assurer qu'il y a toujours du contenu
           textContent: values.textContent || '',
           userId: currentUser.userId,
-          templateId: initialValues?.templateId || uuidv4(),
-          createdAt: initialValues?.createdAt || new Date().toISOString(),
+          templateId: templateData?.templateId || templateId || uuidv4(),
+          createdAt: templateData?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
         
         // Afficher l'objet complet pour débogage
         console.log('⚠️ DEBUG TemplateForm - templateData complet:',  JSON.stringify({
-          ...templateData,
-          htmlContent: templateData.htmlContent ? `[${templateData.htmlContent.length} caractères]` : 'null'
+          ...newTemplateData,
+          htmlContent: newTemplateData.htmlContent ? `[${newTemplateData.htmlContent.length} caractères]` : 'null'
         }));
         
-        if (isEditing) {
-          await updateEmailTemplate(templateData);
+        const isEdit = !!templateId || !!templateData;
+        
+        if (isEdit) {
+          console.log("⚠️ TemplateForm - Mise à jour du template:", newTemplateData.templateId);
+          await updateEmailTemplate(newTemplateData);
           toast.success('Template mis à jour avec succès');
         } else {
-          await createEmailTemplate(templateData);
+          console.log("⚠️ TemplateForm - Création d'un nouveau template");
+          await createEmailTemplate(newTemplateData);
           toast.success('Template créé avec succès');
         }
         
         navigate('/templates');
       } catch (err: any) {
-        console.error('Erreur lors de la sauvegarde du template:', err);
+        console.error('⚠️ TemplateForm - Erreur lors de la sauvegarde du template:', err);
         setError(err.message || 'Une erreur est survenue');
       } finally {
         setIsSubmitting(false);
@@ -203,25 +275,43 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   const handleChangeTab = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
-
-  return (
-    <Layout title={isEditing ? "Modifier un template" : "Créer un template"}>
-      <Box className="animate-fade-in" sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" className="font-bold text-primary-700 mb-2">
-          {isEditing ? "Modifier un template" : "Créer un template"}
-        </Typography>
-        <Typography variant="body1" color="text.secondary" className="mb-6">
-          {isEditing 
-            ? "Modifiez votre template d'email avec l'éditeur HTML intégré." 
-            : "Créez un nouveau template d'email pour vos campagnes."}
-        </Typography>
-      </Box>
-      
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} className="rounded-md">
+  
+  // Affichage pendant le chargement des données
+  if (isLoading) {
+    return (
+      <Layout title="Modèle d'email">
+        <Box className="flex justify-center items-center h-[50vh]">
+          <CircularProgress />
+        </Box>
+      </Layout>
+    );
+  }
+  
+  // Affichage en cas d'erreur
+  if (error) {
+    return (
+      <Layout title="Modèle d'email">
+        <Alert severity="error" className="mb-4">
           {error}
         </Alert>
-      )}
+        <Button 
+          variant="contained" 
+          color="primary"
+          onClick={() => navigate('/templates')}
+        >
+          Retour à la liste des templates
+        </Button>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout title={templateId ? "Modifier le template" : "Nouveau template"}>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" component="h1">
+          {templateId ? "Modifier le template" : "Créer un nouveau template"}
+        </Typography>
+      </Box>
       
       <form onSubmit={formik.handleSubmit}>
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, gap: 3, mb: 3 }}>
@@ -283,7 +373,6 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                   id="fromEmail"
                   name="fromEmail"
                   label="Email de l'expéditeur"
-                  type="email"
                   value={formik.values.fromEmail}
                   onChange={formik.handleChange}
                   onBlur={formik.handleBlur}
@@ -292,12 +381,13 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                   required
                   variant="outlined"
                   className="rounded-md"
+                  type="email"
                 />
               </Box>
             </CardContent>
           </Card>
         </Box>
-        
+
         <Card elevation={1} className="rounded-lg border border-gray-100 mb-4">
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Tabs 
@@ -341,7 +431,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
           </Box>
         </Card>
         
-        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mt: 3 }}>
           <Button
             variant="outlined"
             color="primary"
@@ -362,7 +452,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
             size="large"
             className="rounded-md shadow-md"
           >
-            {isEditing ? "Mettre à jour" : "Créer le template"}
+            {templateId ? "Mettre à jour" : "Créer le template"}
           </Button>
         </Box>
       </form>

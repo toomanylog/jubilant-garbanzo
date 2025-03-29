@@ -16,20 +16,40 @@ const EditSmtpProvider: React.FC = () => {
 
   useEffect(() => {
     const fetchProvider = async () => {
-      if (!currentUser || !providerId) return;
+      if (!currentUser || !providerId) {
+        console.error("⚠️ EditSmtpProvider - User ou providerId manquant:", { 
+          currentUser: !!currentUser, 
+          providerId 
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log("⚠️ EditSmtpProvider - Début du chargement du fournisseur SMTP:", providerId);
       
       try {
+        setIsLoading(true);
+        console.log("⚠️ EditSmtpProvider - Appel de getSmtpProviderById avec providerId:", providerId);
+        
+        // Récupération du fournisseur SMTP par son ID
         const providerData = await getSmtpProviderById(providerId);
+        console.log("⚠️ EditSmtpProvider - Fournisseur récupéré:", providerData ? providerData.name : "null");
         
         // Vérifier que le fournisseur appartient bien à l'utilisateur courant
         if (providerData.userId !== currentUser.userId) {
+          console.error("⚠️ EditSmtpProvider - Le fournisseur n'appartient pas à l'utilisateur:", {
+            providerUserId: providerData.userId,
+            currentUserId: currentUser.userId
+          });
           setError("Vous n'avez pas les droits pour modifier ce fournisseur SMTP");
           return;
         }
         
+        // Mise à jour de l'état avec les données du fournisseur
+        console.log("⚠️ EditSmtpProvider - Mise à jour du state avec le fournisseur");
         setProvider(providerData);
       } catch (err: any) {
-        console.error('Erreur lors de la récupération du fournisseur SMTP:', err);
+        console.error('⚠️ EditSmtpProvider - Erreur lors de la récupération du fournisseur SMTP:', err);
         setError(err.message || 'Une erreur est survenue');
       } finally {
         setIsLoading(false);
@@ -39,6 +59,7 @@ const EditSmtpProvider: React.FC = () => {
     fetchProvider();
   }, [currentUser, providerId]);
 
+  // Rendu conditionnel en fonction de l'état du chargement
   if (isLoading) {
     return (
       <Layout title="Modification du fournisseur SMTP">
@@ -49,6 +70,7 @@ const EditSmtpProvider: React.FC = () => {
     );
   }
 
+  // Affichage en cas d'erreur
   if (error) {
     return (
       <Layout title="Modification du fournisseur SMTP">
@@ -64,6 +86,7 @@ const EditSmtpProvider: React.FC = () => {
     );
   }
 
+  // Affichage si aucun fournisseur n'est trouvé
   if (!provider) {
     return (
       <Layout title="Modification du fournisseur SMTP">
@@ -79,6 +102,12 @@ const EditSmtpProvider: React.FC = () => {
     );
   }
 
+  // Affichage du formulaire avec les données du fournisseur
+  console.log("⚠️ EditSmtpProvider - Rendu du formulaire avec les données:", {
+    name: provider.name,
+    providerType: provider.providerType,
+  });
+  
   return (
     <Layout title="Modification du fournisseur SMTP">
       <Box sx={{ mb: 4 }}>
