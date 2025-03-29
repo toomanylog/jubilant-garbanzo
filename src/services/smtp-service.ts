@@ -39,13 +39,21 @@ export class AwsSesService extends SmtpService {
   constructor(provider: SmtpProvider) {
     super(provider);
     
-    // Utilisation des informations d'identification fournies par l'utilisateur
+    // Utiliser la configuration globale AWS pour la région et les identifiants
+    // mais permettre de les remplacer par ceux du fournisseur si nécessaire
+    const awsConfig = AWS.config;
+    
+    console.log('⚠️ Configuration SES - Utilisation de la région:', provider.region || awsConfig.region || 'us-east-1');
+    console.log('⚠️ Configuration SES - Access Key fournie par le fournisseur:', !!provider.username);
+    console.log('⚠️ Configuration SES - Access Key globale:', !!awsConfig.credentials?.accessKeyId);
+    
+    // Créer une instance SES avec les identifiants et la région appropriés
     this.ses = new AWS.SES({
-      region: provider.region || 'us-east-1',
-      credentials: {
-        accessKeyId: provider.username || '',
-        secretAccessKey: provider.password || ''
-      }
+      region: provider.region || awsConfig.region || 'us-east-1',
+      credentials: provider.username && provider.password ? {
+        accessKeyId: provider.username,
+        secretAccessKey: provider.password
+      } : awsConfig.credentials
     });
   }
 
