@@ -117,11 +117,29 @@ export class CampaignService {
         return false;
       }
 
-      // Récupérer le template
-      const template = await TemplateService.getTemplate(campaign.templateId);
-      if (!template) {
-        console.error(`Template ${campaign.templateId} non trouvé pour la campagne ${campaignId}`);
-        await this.updateCampaignStatus(campaignId, 'failed', 'Template non trouvé');
+      // Vérifier si nous avons plusieurs templates (format: template1,template2,template3)
+      let templateIds: string[] = [];
+      if (campaign.templateId.includes(',')) {
+        templateIds = campaign.templateId.split(',').map(id => id.trim());
+        console.log(`Utilisation de ${templateIds.length} templates pour la campagne ${campaignId}`);
+      } else {
+        templateIds = [campaign.templateId];
+      }
+
+      // Récupérer tous les templates
+      const templates: any[] = [];
+      for (const templateId of templateIds) {
+        const template = await TemplateService.getTemplate(templateId);
+        if (!template) {
+          console.error(`Template ${templateId} non trouvé pour la campagne ${campaignId}`);
+          continue;
+        }
+        templates.push(template);
+      }
+
+      if (templates.length === 0) {
+        console.error(`Aucun template valide trouvé pour la campagne ${campaignId}`);
+        await this.updateCampaignStatus(campaignId, 'failed', 'Aucun template valide trouvé');
         return false;
       }
 
@@ -155,6 +173,11 @@ export class CampaignService {
         // Traitement parallèle des destinataires dans le lot actuel
         const sendPromises = batch.map(async (recipient: Recipient) => {
           try {
+            // Sélectionner un template aléatoire si plusieurs sont disponibles
+            const template = templates.length > 1 
+              ? templates[Math.floor(Math.random() * templates.length)]
+              : templates[0];
+            
             // Personnalisation du contenu HTML
             const personalizedHtml = this.personalizeContent(template.htmlContent, {
               firstName: recipient.firstName || '',
@@ -175,13 +198,13 @@ export class CampaignService {
             const result = await smtpService.sendEmail({
               to: recipient.email,
               from: {
-                email: campaign.fromEmail || 'noreply@example.com',
-                name: campaign.fromName || 'North Eyes'
+                email: campaign.fromEmail || template.fromEmail || 'noreply@example.com',
+                name: campaign.fromName || template.fromName || 'North Eyes'
               },
               subject: personalizedSubject,
               html: personalizedHtml,
               text: this.htmlToText(personalizedHtml),
-              replyTo: campaign.fromEmail,
+              replyTo: campaign.fromEmail || template.fromEmail,
               variables: recipient.variables
             });
 
@@ -190,7 +213,7 @@ export class CampaignService {
               successCount++;
               
               // Enregistrer le suivi de l'email envoyé
-              await this.trackEmailSent(campaignId, recipient.email, result.messageId);
+              await this.trackEmailSent(campaignId, recipient.email, result.messageId, template.templateId);
             } else if (result.error?.includes('bounce')) {
               bounceCount++;
               failureCount++;
@@ -274,7 +297,7 @@ export class CampaignService {
   }
 
   // Enregistre le suivi d'un email envoyé
-  private static async trackEmailSent(campaignId: string, recipientEmail: string, messageId?: string): Promise<void> {
+  private static async trackEmailSent(campaignId: string, recipientEmail: string, messageId?: string, templateId?: string): Promise<void> {
     try {
       await dynamoDB.put({
         TableName: 'EmailTracking',
@@ -287,7 +310,8 @@ export class CampaignService {
           status: 'sent',
           openedTimestamp: null,
           clickedTimestamp: null,
-          clickedLinks: []
+          clickedLinks: [],
+          templateId
         }
       }).promise();
     } catch (error) {

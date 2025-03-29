@@ -1,6 +1,6 @@
 import AWS from 'aws-sdk';
 import axios from 'axios';
-import { SmtpProvider } from '../models/dynamodb';
+import { SmtpProvider, SmtpSender } from '../models/dynamodb';
 
 // Interface pour les options d'envoi d'email
 export interface EmailOptions {
@@ -35,6 +35,7 @@ abstract class SmtpService {
 // AWS SES Service
 export class AwsSesService extends SmtpService {
   private ses: AWS.SES;
+  private senderIndex: number = 0;
 
   constructor(provider: SmtpProvider) {
     super(provider);
@@ -56,15 +57,61 @@ export class AwsSesService extends SmtpService {
     
     console.log('⚠️ Configuration SES - Hôte SMTP utilisé:', provider.host || `email-smtp.${region}.amazonaws.com`);
     
+    // Création des informations d'authentification
+    const credentials = provider.username && provider.password ? {
+      accessKeyId: provider.username,
+      secretAccessKey: provider.password
+    } : awsConfig.credentials;
+    
+    // Vérifier les identifiants
+    if (!credentials || !credentials.accessKeyId || !credentials.secretAccessKey) {
+      console.error('⚠️ Configuration SES - Identifiants AWS manquants ou incomplets');
+    } else {
+      console.log('⚠️ Configuration SES - Identifiants valides disponibles');
+    }
+    
     // Créer une instance SES avec les identifiants et la région appropriés
     this.ses = new AWS.SES({
       region: region,
-      endpoint: `https://email.${region}.amazonaws.com`,
-      credentials: provider.username && provider.password ? {
-        accessKeyId: provider.username,
-        secretAccessKey: provider.password
-      } : awsConfig.credentials
+      credentials: credentials,
+      // Ne pas définir d'endpoint personnalisé pour permettre à AWS SDK de choisir le bon endpoint basé sur la région
+      // Cela évite les erreurs de signature
     });
+    
+    console.log(`⚠️ Configuration SES - Instance SES créée pour la région ${region}`);
+  }
+
+  // Obtient le prochain expéditeur selon la stratégie de rotation
+  private getNextSender(): SmtpSender | null {
+    // Si aucun expéditeur n'est défini ou si la rotation est désactivée, retourner null
+    if (!this.provider.senders || this.provider.senders.length === 0 || !this.provider.senderRotationEnabled) {
+      return null;
+    }
+
+    // Filtrer les expéditeurs actifs
+    const activeSenders = this.provider.senders.filter(sender => sender.isActive);
+    if (activeSenders.length === 0) {
+      return null;
+    }
+
+    // Sélectionner le prochain expéditeur selon la stratégie de rotation
+    let sender: SmtpSender;
+
+    if (this.provider.senderRotationType === 'random') {
+      // Sélection aléatoire
+      const randomIndex = Math.floor(Math.random() * activeSenders.length);
+      sender = activeSenders[randomIndex];
+    } else {
+      // Sélection séquentielle (par défaut)
+      if (this.senderIndex >= activeSenders.length) {
+        this.senderIndex = 0;
+      }
+      sender = activeSenders[this.senderIndex];
+      this.senderIndex++;
+    }
+
+    console.log(`⚠️ Rotation d'expéditeur - Utilisation de: ${sender.name} <${sender.email}>`);
+    return sender;
   }
 
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
@@ -72,13 +119,22 @@ export class AwsSesService extends SmtpService {
       // Convertir 'to' en tableau si c'est une chaîne
       const toAddresses = Array.isArray(options.to) ? options.to : [options.to];
       
-      // Préparer l'expéditeur
+      // Préparer l'expéditeur en tenant compte de la rotation
       let source: string;
-      if (typeof options.from === 'string') {
+      const nextSender = this.getNextSender();
+      
+      if (nextSender) {
+        // Utiliser l'expéditeur obtenu par rotation
+        source = `${nextSender.name} <${nextSender.email}>`;
+      } else if (typeof options.from === 'string') {
+        // Utiliser l'expéditeur fourni dans les options
         source = options.from;
       } else {
+        // Utiliser l'expéditeur fourni dans les options (format objet)
         source = `${options.from.name} <${options.from.email}>`;
       }
+      
+      console.log(`⚠️ Envoi d'email - De: ${source}`);
 
       const params = {
         Source: source,
