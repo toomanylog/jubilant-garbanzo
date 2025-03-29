@@ -30,6 +30,7 @@ import CampaignList from './pages/campaigns/CampaignList';
 import CampaignForm from './pages/campaigns/CampaignForm';
 import CampaignDetails from './pages/campaigns/CampaignDetails';
 import SettingsPage from './pages/settings/SettingsPage';
+import ProfilePage from './pages/profile/ProfilePage';
 
 // Contexte d'authentification
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -207,6 +208,16 @@ const App: React.FC = () => {
                   element={
                     <ProtectedRoute>
                       <SettingsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                
+                {/* Route pour le profil utilisateur */}
+                <Route 
+                  path="/profile" 
+                  element={
+                    <ProtectedRoute>
+                      <ProfilePage />
                     </ProtectedRoute>
                   }
                 />
