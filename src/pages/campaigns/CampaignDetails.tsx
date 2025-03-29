@@ -126,23 +126,23 @@ const CampaignDetails: React.FC = () => {
   const handleSendCampaign = async () => {
     if (!campaignId) return;
     
-    setIsProcessing(true);
+    setIsLoading(true);
     
     try {
       const result = await CampaignService.sendCampaign(campaignId);
       
-      if (result.success) {
+      if (result) {
         toast.success('La campagne a été envoyée avec succès');
         // Recharger les données
-        window.location.reload();
+        fetchData();
       } else {
-        toast.error(`Erreur lors de l'envoi: ${result.error}`);
+        toast.error('Échec de l\'envoi de la campagne');
       }
     } catch (err: any) {
       toast.error(err.message || 'Une erreur est survenue');
     } finally {
-      setIsProcessing(false);
-      handleCloseSendDialog();
+      setIsLoading(false);
+      setOpenSendDialog(false);
     }
   };
 
