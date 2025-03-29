@@ -557,7 +557,7 @@ export class CampaignService {
         ExpressionAttributeValues: {
           ':status': status,
           ':updatedAt': Date.now()
-        },
+        } as Record<string, any>,
         ReturnValues: 'UPDATED_NEW'
       };
       
@@ -595,7 +595,7 @@ export class CampaignService {
         UpdateExpression: 'SET updatedAt = :updatedAt',
         ExpressionAttributeValues: {
           ':updatedAt': Date.now()
-        },
+        } as Record<string, any>,
         ReturnValues: 'UPDATED_NEW'
       };
       
