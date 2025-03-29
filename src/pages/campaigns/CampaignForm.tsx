@@ -341,7 +341,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
         fromName: fromNameValue,
         fromEmail: fromEmailValue,
         recipients: recipientsValue,
-        content: initialValues.content || '',
+        content: '',
         rotationOptions: initialValues.rotationOptions || {
           templateRotation: 'sequential',
           smtpRotation: 'sequential',
