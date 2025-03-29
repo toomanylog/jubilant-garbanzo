@@ -9,7 +9,8 @@ import {
   addClickToEmailTracking,
   getCampaignTracking,
   updateEmailCampaign,
-  getEmailTrackingByMessageId
+  getEmailTrackingByMessageId,
+  getEmailCampaignById
 } from '../models/dynamodb';
 
 // Utiliser le domaine de l'application déployée
@@ -59,25 +60,45 @@ export class TrackingService {
    * @returns HTML avec les liens de tracking
    */
   static trackLinks(htmlContent: string, campaignId: string, recipientEmail: string, messageId: string): string {
-    // Regex pour trouver les liens
-    const linkRegex = /<a\s+(?:[^>]*?\s+)?href="([^"]*)"([^>]*)>(.*?)<\/a>/gi;
-    
-    // Remplacer les liens
-    return htmlContent.replace(linkRegex, (match, url, attrs, text) => {
-      // Ignorer les liens d'ancre, mailto et tel
-      if (url.startsWith('#') || url.startsWith('mailto:') || url.startsWith('tel:')) {
-        return match;
-      }
+    try {
+      // Regex pour trouver les liens, plus robuste pour gérer différents formats d'attributs
+      const linkRegex = /<a\s+([^>]*?href\s*=\s*["']([^"']+)["'][^>]*)>([\s\S]*?)<\/a>/gi;
+      let matches = 0;
       
-      // Générer un ID unique pour ce lien
-      const linkId = uuidv4();
+      // Remplacer les liens
+      const result = htmlContent.replace(linkRegex, (match, attrs, url, text) => {
+        // Ignorer les liens d'ancre, mailto et tel
+        if (!url || url.startsWith('#') || url.startsWith('mailto:') || url.startsWith('tel:')) {
+          console.log(`⚠️ Lien ignoré pour le tracking: ${url}`);
+          return match;
+        }
+        
+        try {
+          // Vérifier si l'URL est valide
+          new URL(url);
+          
+          // Générer un ID unique pour ce lien
+          const linkId = uuidv4();
+          
+          // Créer l'URL de redirection avec notre nouvelle route
+          const redirectUrl = `${SITE_URL}/track/r/${linkId}?l=${encodeURIComponent(linkId)}&c=${encodeURIComponent(campaignId)}&e=${encodeURIComponent(recipientEmail)}&m=${encodeURIComponent(messageId)}&u=${encodeURIComponent(url)}`;
+          
+          // Remplacer le lien en préservant tous les autres attributs
+          matches++;
+          console.log(`⚠️ Lien #${matches} tracké: ${url}`);
+          return `<a ${attrs.replace(/href\s*=\s*["'][^"']+["']/i, `href="${redirectUrl}"`)}>${text}</a>`;
+        } catch (error) {
+          console.error(`Erreur lors du tracking du lien ${url}:`, error);
+          return match; // En cas d'erreur, conserver le lien original
+        }
+      });
       
-      // Créer l'URL de redirection avec notre nouvelle route
-      const redirectUrl = `${SITE_URL}/track/r/${linkId}?l=${encodeURIComponent(linkId)}&c=${encodeURIComponent(campaignId)}&e=${encodeURIComponent(recipientEmail)}&m=${encodeURIComponent(messageId)}&u=${encodeURIComponent(url)}`;
-      
-      // Remplacer le lien
-      return `<a href="${redirectUrl}"${attrs}>${text}</a>`;
-    });
+      console.log(`⚠️ Tracking des liens: ${matches} liens trackés`);
+      return result;
+    } catch (error) {
+      console.error('Erreur lors du tracking des liens:', error);
+      return htmlContent; // En cas d'erreur, retourner le HTML original
+    }
   }
 
   /**
@@ -134,16 +155,29 @@ export class TrackingService {
   static prepareHtmlWithTracking(htmlContent: string, campaignId: string, recipientEmail: string, messageId: string, trackingItem: EmailTrackingItem): string {
     console.log(`⚠️ Préparation du tracking HTML pour ${recipientEmail}`);
     
-    // Générer le pixel de tracking
-    const pixelHtml = this.generateTrackingPixel(campaignId, recipientEmail, trackingItem.pixelId);
-    
-    // D'abord tracker les liens
-    let trackedHtml = this.trackLinks(htmlContent, campaignId, recipientEmail, messageId);
-    
-    // Ensuite insérer le pixel
-    trackedHtml = this.insertTrackingPixel(trackedHtml, pixelHtml);
-    
-    return trackedHtml;
+    try {
+      // Générer le pixel de tracking
+      const pixelHtml = this.generateTrackingPixel(campaignId, recipientEmail, trackingItem.pixelId);
+      
+      // D'abord tracker les liens
+      console.log(`⚠️ Ajout du tracking des liens dans le HTML`);
+      let trackedHtml = this.trackLinks(htmlContent, campaignId, recipientEmail, messageId);
+      
+      // Ensuite insérer le pixel à la fin du body ou à la fin du contenu
+      console.log(`⚠️ Insertion du pixel de tracking dans le HTML`);
+      if (trackedHtml.includes('</body>')) {
+        trackedHtml = trackedHtml.replace('</body>', `${pixelHtml}</body>`);
+      } else {
+        trackedHtml = trackedHtml + pixelHtml;
+      }
+      
+      console.log(`⚠️ HTML avec tracking préparé avec succès`);
+      return trackedHtml;
+    } catch (error) {
+      console.error('Erreur lors de la préparation du HTML avec tracking:', error);
+      // En cas d'erreur, retourner le HTML original pour ne pas bloquer l'envoi
+      return htmlContent;
+    }
   }
 
   /**
@@ -321,8 +355,7 @@ export class TrackingService {
   private static async getCampaign(campaignId: string): Promise<EmailCampaign | null> {
     try {
       // Récupérer la campagne depuis DynamoDB
-      // Ajoutez votre code ici pour récupérer la campagne
-      return null;
+      return await getEmailCampaignById(campaignId);
     } catch (error) {
       console.error(`Erreur lors de la récupération de la campagne ${campaignId}:`, error);
       return null;

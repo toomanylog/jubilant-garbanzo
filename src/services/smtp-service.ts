@@ -108,21 +108,101 @@ abstract class SmtpService {
   protected isHtmlContent(content: string): boolean {
     // Version plus robuste pour détecter le HTML
     // 1. Recherche de balises HTML courantes
-    const htmlRegex = /<([a-z][a-z0-9]*)\b[^>]*>(.*?)<\/\1>/i;
-    // 2. Recherche de balises auto-fermantes
-    const selfClosingRegex = /<([a-z][a-z0-9]*)\b[^>]*\/>/i;
-    // 3. Recherche de balises HTML structurelles
-    const structuralTags = ['html', 'body', 'div', 'p', 'span', 'table', 'tr', 'td', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+    const htmlTagsRegex = /<[a-z][\s\S]*>/i;
+    // 2. Recherche de balises spécifiques qui indiquent clairement du HTML
+    const htmlSpecificRegex = /<(html|body|div|p|span|table|h[1-6]|ul|ol|li|a|img)[\s>]/i;
     
-    // Vérifier si le contenu contient des balises HTML
-    const hasHtmlTags = htmlRegex.test(content);
-    const hasSelfClosingTags = selfClosingRegex.test(content);
-    const hasStructuralTags = structuralTags.some(tag => 
-      content.includes(`<${tag}`) || content.includes(`<${tag} `)
-    );
+    // Si c'est clairement du HTML
+    if (htmlSpecificRegex.test(content)) {
+      console.log("⚠️ Contenu détecté comme HTML (balises spécifiques)");
+      return true;
+    }
     
-    // Si le contenu contient des balises HTML, c'est du HTML
-    return hasHtmlTags || hasSelfClosingTags || hasStructuralTags;
+    // Si ça contient des balises mais pas forcément des balises spécifiques
+    if (htmlTagsRegex.test(content)) {
+      console.log("⚠️ Contenu détecté comme HTML (balises génériques)");
+      return true;
+    }
+    
+    console.log("⚠️ Contenu détecté comme texte brut");
+    return false;
+  }
+
+  // Assure que le HTML a une structure complète
+  protected ensureCompleteHtmlStructure(html: string): string {
+    // Si le contenu est vide, retourner une structure HTML minimale
+    if (!html || html.trim() === '') {
+      console.log("⚠️ Contenu HTML vide, création d'une structure minimale");
+      return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body></body></html>`;
+    }
+    
+    // Vérifier s'il contient déjà des balises de structure essentielles
+    const hasDoctype = /<!doctype\s+html>/i.test(html);
+    const hasHtmlTag = /<html[\s>]/i.test(html);
+    const hasHeadTag = /<head[\s>]/i.test(html);
+    const hasBodyTag = /<body[\s>]/i.test(html);
+    
+    // Si le contenu possède déjà toutes les balises structurelles, le retourner tel quel
+    if (hasDoctype && hasHtmlTag && hasHeadTag && hasBodyTag) {
+      console.log("⚠️ HTML déjà structuré correctement");
+      return html;
+    }
+    
+    // Si le contenu ne possède pas de structure HTML, l'envelopper dans une structure complète
+    if (!hasHtmlTag && !hasBodyTag) {
+      console.log("⚠️ Ajout d'une structure HTML complète autour du contenu");
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+  ${html}
+</body>
+</html>`;
+    }
+    
+    // Cas où il y a certaines balises mais pas toutes
+    let modifiedHtml = html;
+    
+    if (!hasDoctype) {
+      console.log("⚠️ Ajout du DOCTYPE");
+      modifiedHtml = `<!DOCTYPE html>\n${modifiedHtml}`;
+    }
+    
+    if (!hasHtmlTag) {
+      console.log("⚠️ Ajout des balises HTML");
+      modifiedHtml = `<html>\n${modifiedHtml}\n</html>`;
+    }
+    
+    if (!hasHeadTag) {
+      console.log("⚠️ Ajout des balises HEAD");
+      if (hasBodyTag) {
+        // Insérer avant <body>
+        modifiedHtml = modifiedHtml.replace(/<body[\s>]/i, '<head><meta charset="UTF-8"></head>$&');
+      } else {
+        // Insérer après <html>
+        modifiedHtml = modifiedHtml.replace(/<html[\s>]/i, '$&\n<head><meta charset="UTF-8"></head>');
+      }
+    }
+    
+    if (!hasBodyTag) {
+      console.log("⚠️ Ajout des balises BODY");
+      if (hasHeadTag) {
+        // Insérer après </head>
+        modifiedHtml = modifiedHtml.replace(/<\/head>/i, '$&\n<body>');
+        // Ajouter </body> avant </html>
+        modifiedHtml = modifiedHtml.replace(/<\/html>/i, '</body>\n$&');
+      } else {
+        // Cas moins probable mais possible
+        modifiedHtml = modifiedHtml.replace(/<html[\s>]/i, '$&\n<body>');
+        modifiedHtml = modifiedHtml.replace(/<\/html>/i, '</body>\n$&');
+      }
+    }
+    
+    console.log("⚠️ Structure HTML corrigée");
+    return modifiedHtml;
   }
 
   // Convertit HTML en texte pour les lecteurs de mails qui ne supportent pas le HTML
@@ -254,12 +334,36 @@ export class AwsSesService extends SmtpService {
       
       console.log(`⚠️ Envoi d'email - De: ${source}`);
 
-      // Toujours considérer le contenu comme HTML pour les emails de templates
-      const isHtml = true; // Forcer la détection HTML
-      console.log(`⚠️ Envoi d'email - Format: HTML (forcé pour compatibilité)`);
+      // S'assurer que le contenu HTML est correctement formaté
+      let htmlContent = options.html;
+      
+      // Vérifier si le contenu est du HTML et structurer correctement si nécessaire
+      const isHtml = this.isHtmlContent(htmlContent);
+      console.log(`⚠️ Envoi d'email - Le contenu est considéré comme HTML: ${isHtml}`);
+      
+      if (isHtml) {
+        // Assurer que le HTML a une structure complète
+        htmlContent = this.ensureCompleteHtmlStructure(htmlContent);
+        console.log(`⚠️ Envoi d'email - Structure HTML validée`);
+      } else {
+        // Si ce n'est pas du HTML, le convertir en HTML simple
+        htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+  <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+    ${options.html.split('\n').map(line => `<p>${line}</p>`).join('')}
+  </div>
+</body>
+</html>`;
+        console.log(`⚠️ Envoi d'email - Texte converti en HTML`);
+      }
 
       // Assurer que le texte est disponible
-      const textContent = options.text || this.htmlToText(options.html);
+      const textContent = options.text || this.htmlToText(htmlContent);
 
       const params = {
         Source: source,
@@ -274,7 +378,7 @@ export class AwsSesService extends SmtpService {
           },
           Body: {
             Html: {
-              Data: options.html,
+              Data: htmlContent,
               Charset: 'UTF-8'
             },
             Text: {
@@ -285,7 +389,9 @@ export class AwsSesService extends SmtpService {
         }
       };
 
+      console.log(`⚠️ Envoi d'email - Envoi en cours`);
       const result = await this.ses.sendEmail(params).promise();
+      console.log(`⚠️ Envoi d'email - Email envoyé avec succès, MessageId: ${result.MessageId}`);
       
       // Mettre à jour les compteurs d'envoi
       this.updateSendCounts();
