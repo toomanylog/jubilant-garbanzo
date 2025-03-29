@@ -1,66 +1,154 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
   TextField,
   Button,
-  Paper,
-  Grid,
-  FormHelperText,
+  CircularProgress,
   Alert,
-  CircularProgress
+  Divider,
+  CardContent,
+  Card,
+  CardHeader,
+  useTheme,
+  useMediaQuery,
+  InputAdornment,
+  IconButton,
+  Tab,
+  Tabs
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'react-toastify';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import SaveIcon from '@mui/icons-material/Save';
+import CancelIcon from '@mui/icons-material/Cancel';
+import CodeIcon from '@mui/icons-material/Code';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import { Controlled as CodeMirror } from 'react-codemirror2';
+
+import 'codemirror/lib/codemirror.css';
+import 'codemirror/theme/material.css';
+import 'codemirror/mode/htmlmixed/htmlmixed';
+import 'codemirror/mode/xml/xml';
+import 'codemirror/mode/javascript/javascript';
+import 'codemirror/mode/css/css';
 
 import Layout from '../../components/layout/Layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
   EmailTemplate, 
   createEmailTemplate, 
-  updateEmailTemplate,
-  getEmailTemplateById
+  updateEmailTemplate
 } from '../../models/dynamodb';
 
-// Props du composant
+// Props pour le composant
 interface TemplateFormProps {
   initialValues?: EmailTemplate;
   isEditing?: boolean;
 }
 
+// Typages pour CodeMirror
+interface EditorChangeHandler {
+  (editor: any, data: any, value: string): void;
+}
+
 const TemplateForm: React.FC<TemplateFormProps> = ({ 
   initialValues,
-  isEditing = false 
+  isEditing = false
 }) => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const { templateId } = useParams<{ templateId: string }>();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [htmlContent, setHtmlContent] = useState(initialValues?.htmlContent || '');
+  const [activeTab, setActiveTab] = useState(0);
 
-  // Valeurs par défaut
+  // Pour debugger les valeurs initiales
+  console.log('⚠️ DEBUG TemplateForm - initialValues:', initialValues);
+
+  // Valeurs par défaut du formulaire
   const defaultValues = {
     name: '',
     subject: '',
     fromName: '',
     fromEmail: '',
-    htmlContent: '',
+    htmlContent: `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Template</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #ffffff;
+    }
+    .header {
+      text-align: center;
+      padding: 20px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .content {
+      padding: 20px 0;
+    }
+    .footer {
+      text-align: center;
+      padding: 20px 0;
+      font-size: 12px;
+      color: #999;
+      border-top: 1px solid #eee;
+    }
+    .button {
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: #0066cc;
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>North Eyes</h1>
+    </div>
+    <div class="content">
+      <h2>Bonjour {{name}},</h2>
+      <p>Voici votre email personnalisé.</p>
+      <p>Sentez-vous libre de modifier ce modèle selon vos besoins.</p>
+      <p><a href="#" class="button">Appel à l'action</a></p>
+    </div>
+    <div class="footer">
+      <p>© 2023 North Eyes. Tous droits réservés.</p>
+      <p><a href="{{unsubscribe_link}}">Se désabonner</a></p>
+    </div>
+  </div>
+</body>
+</html>`,
     textContent: ''
   };
 
   // Schéma de validation
   const validationSchema = Yup.object().shape({
     name: Yup.string().required('Le nom est requis'),
-    subject: Yup.string().required('L\'objet est requis'),
-    fromName: Yup.string().required('Le nom d\'expéditeur est requis'),
-    fromEmail: Yup.string().email('Email invalide').required('L\'email d\'expéditeur est requis')
+    subject: Yup.string().required('Le sujet est requis'),
+    fromName: Yup.string().required('Le nom de l\'expéditeur est requis'),
+    fromEmail: Yup.string().email('Email invalide').required('L\'email de l\'expéditeur est requis'),
+    htmlContent: Yup.string().required('Le contenu HTML est requis')
   });
 
   // Gestion du formulaire avec Formik
@@ -74,11 +162,18 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
       setError(null);
       
       try {
+        // Vérifier que le contenu HTML est valide
+        if (!values.htmlContent || values.htmlContent.trim() === '') {
+          throw new Error('Le contenu HTML ne peut pas être vide');
+        }
+        
+        // S'assurer que le contenu HTML est correctement formaté
+        console.log('⚠️ DEBUG TemplateForm - Contenu HTML envoyé:', values.htmlContent?.substring(0, 100) + '...');
+        
         const templateData: EmailTemplate = {
           ...values,
-          htmlContent,
           userId: currentUser.userId,
-          templateId: templateId || uuidv4(),
+          templateId: initialValues?.templateId || uuidv4(),
           createdAt: initialValues?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
@@ -101,215 +196,185 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     }
   });
 
-  // Modules pour l'éditeur Quill
-  const quillModules = {
-    toolbar: [
-      [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      [{ 'color': [] }, { 'background': [] }],
-      [{ 'align': [] }],
-      ['link', 'image'],
-      ['clean']
-    ],
+  const handlePreview = () => {
+    // Stocker les valeurs actuelles temporairement pour la prévisualisation
+    localStorage.setItem('temp_template_preview', JSON.stringify(formik.values));
+    window.open(`/templates/preview-temp`, '_blank');
   };
 
-  // Formats pour l'éditeur Quill
-  const quillFormats = [
-    'header',
-    'bold', 'italic', 'underline', 'strike',
-    'list', 'bullet',
-    'color', 'background',
-    'align',
-    'link', 'image'
-  ];
-
-  // Chargement initial du template si mode édition
-  useEffect(() => {
-    if (isEditing && templateId) {
-      const fetchTemplate = async () => {
-        setIsLoading(true);
-        try {
-          const template = await getEmailTemplateById(templateId);
-          if (template) {
-            formik.setValues({
-              name: template.name,
-              subject: template.subject,
-              fromName: template.fromName,
-              fromEmail: template.fromEmail,
-              htmlContent: template.htmlContent || '',
-              textContent: template.textContent || ''
-            });
-            setHtmlContent(template.htmlContent || '');
-          } else {
-            setError('Template non trouvé');
-          }
-        } catch (err: any) {
-          setError(err.message || 'Erreur lors du chargement du template');
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      fetchTemplate();
-    }
-  }, [isEditing, templateId, formik]);
-
-  // Afficher un spinner pendant le chargement
-  if (isLoading) {
-    return (
-      <Layout title={isEditing ? 'Éditer un modèle' : 'Créer un modèle'}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
-          <CircularProgress />
-        </Box>
-      </Layout>
-    );
-  }
+  const handleChangeTab = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
 
   return (
-    <Layout title={isEditing ? 'Éditer un modèle' : 'Créer un modèle'}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1">
-          {isEditing ? 'Éditer un modèle d\'email' : 'Créer un modèle d\'email'}
+    <Layout title={isEditing ? "Modifier un template" : "Créer un template"}>
+      <Box className="animate-fade-in" sx={{ mb: 4 }}>
+        <Typography variant="h4" component="h1" className="font-bold text-primary-700 mb-2">
+          {isEditing ? "Modifier un template" : "Créer un template"}
+        </Typography>
+        <Typography variant="body1" color="text.secondary" className="mb-6">
+          {isEditing 
+            ? "Modifiez votre template d'email avec l'éditeur HTML intégré." 
+            : "Créez un nouveau template d'email pour vos campagnes."}
         </Typography>
       </Box>
       
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" sx={{ mb: 3 }} className="rounded-md">
           {error}
         </Alert>
       )}
       
-      <Paper elevation={2} sx={{ p: 3 }}>
-        <form onSubmit={formik.handleSubmit}>
-          <Grid container component="div" spacing={3}>
-            <Grid sx={{ display: 'flex', flexDirection: 'column' }} xs={12}>
-              <TextField
-                fullWidth
-                id="name"
-                name="name"
-                label="Nom du template"
-                value={formik.values.name}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-                error={formik.touched.name && Boolean(formik.errors.name)}
-                helperText={formik.touched.name && formik.errors.name}
-                required
-              />
-            </Grid>
-            
-            <Grid sx={{ display: 'flex', flexDirection: 'column' }} xs={12}>
-              <TextField
-                fullWidth
-                id="subject"
-                name="subject"
-                label="Sujet de l'email"
-                value={formik.values.subject}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-                error={formik.touched.subject && Boolean(formik.errors.subject)}
-                helperText={formik.touched.subject && formik.errors.subject}
-                required
-              />
-            </Grid>
-            
-            <Grid sx={{ display: 'flex', flexDirection: 'column' }} xs={12} md={6}>
-              <TextField
-                fullWidth
-                id="fromName"
-                name="fromName"
-                label="Nom de l'expéditeur"
-                value={formik.values.fromName}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-                error={formik.touched.fromName && Boolean(formik.errors.fromName)}
-                helperText={formik.touched.fromName && formik.errors.fromName}
-                required
-              />
-            </Grid>
-            
-            <Grid sx={{ display: 'flex', flexDirection: 'column' }} xs={12} md={6}>
-              <TextField
-                fullWidth
-                id="fromEmail"
-                name="fromEmail"
-                label="Email de l'expéditeur"
-                type="email"
-                value={formik.values.fromEmail}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-                error={formik.touched.fromEmail && Boolean(formik.errors.fromEmail)}
-                helperText={formik.touched.fromEmail && formik.errors.fromEmail}
-                required
-              />
-            </Grid>
-            
-            <Grid sx={{ display: 'flex', flexDirection: 'column' }} xs={12}>
-              <Typography variant="h6" component="h3" sx={{ mb: 2 }}>
-                Contenu HTML
-              </Typography>
-              <ReactQuill
-                theme="snow"
-                value={formik.values.htmlContent}
-                onChange={(value) => formik.setFieldValue('htmlContent', value)}
-                modules={quillModules}
-                formats={quillFormats}
-                style={{ 
-                  height: '300px', 
-                  marginBottom: '50px'
-                }}
-              />
-              {formik.touched.htmlContent && formik.errors.htmlContent && (
-                <FormHelperText error>{formik.errors.htmlContent as string}</FormHelperText>
-              )}
-            </Grid>
-            
-            <Grid sx={{ display: 'flex', flexDirection: 'column' }} xs={12}>
-              <TextField
-                fullWidth
-                id="textContent"
-                name="textContent"
-                label="Contenu texte (version alternative sans HTML)"
-                multiline
-                rows={6}
-                value={formik.values.textContent}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-              />
-            </Grid>
-            
-            <Grid sx={{ display: 'flex', flexDirection: 'column' }} xs={12}>
-              <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  type="submit"
-                  disabled={isSubmitting}
-                  startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
-                >
-                  {isEditing ? "Mettre à jour" : "Créer"}
-                </Button>
-                <Button
+      <form onSubmit={formik.handleSubmit}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, gap: 3, mb: 3 }}>
+          <Card elevation={1} sx={{ flex: 1 }} className="rounded-lg border border-gray-100">
+            <CardHeader 
+              title="Informations générales" 
+              className="border-b border-gray-100 bg-gray-50 px-4 py-3"
+              titleTypographyProps={{ variant: 'subtitle1', className: 'font-medium' }}
+            />
+            <CardContent>
+              <Box sx={{ mb: 3 }}>
+                <TextField
+                  fullWidth
+                  id="name"
+                  name="name"
+                  label="Nom du template"
+                  value={formik.values.name}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  error={formik.touched.name && Boolean(formik.errors.name)}
+                  helperText={formik.touched.name && formik.errors.name}
+                  required
                   variant="outlined"
-                  onClick={() => navigate('/templates')}
-                  disabled={isSubmitting}
-                >
-                  Annuler
-                </Button>
-                {isEditing && (
-                  <Button
-                    variant="outlined"
-                    color="secondary"
-                    onClick={() => navigate(`/templates/${templateId}/preview`)}
-                    disabled={isSubmitting}
-                  >
-                    Prévisualiser
-                  </Button>
-                )}
+                  className="rounded-md mb-4"
+                />
+                
+                <TextField
+                  fullWidth
+                  id="subject"
+                  name="subject"
+                  label="Sujet de l'email"
+                  value={formik.values.subject}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  error={formik.touched.subject && Boolean(formik.errors.subject)}
+                  helperText={formik.touched.subject && formik.errors.subject}
+                  required
+                  variant="outlined"
+                  className="rounded-md mb-4"
+                />
+                
+                <TextField
+                  fullWidth
+                  id="fromName"
+                  name="fromName"
+                  label="Nom de l'expéditeur"
+                  value={formik.values.fromName}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  error={formik.touched.fromName && Boolean(formik.errors.fromName)}
+                  helperText={formik.touched.fromName && formik.errors.fromName}
+                  required
+                  variant="outlined"
+                  className="rounded-md mb-4"
+                />
+                
+                <TextField
+                  fullWidth
+                  id="fromEmail"
+                  name="fromEmail"
+                  label="Email de l'expéditeur"
+                  type="email"
+                  value={formik.values.fromEmail}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  error={formik.touched.fromEmail && Boolean(formik.errors.fromEmail)}
+                  helperText={formik.touched.fromEmail && formik.errors.fromEmail}
+                  required
+                  variant="outlined"
+                  className="rounded-md"
+                />
               </Box>
-            </Grid>
-          </Grid>
-        </form>
-      </Paper>
+            </CardContent>
+          </Card>
+        </Box>
+        
+        <Card elevation={1} className="rounded-lg border border-gray-100 mb-4">
+          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Tabs 
+              value={activeTab} 
+              onChange={handleChangeTab} 
+              aria-label="editeur de template"
+              variant={isMobile ? "fullWidth" : "standard"}
+              className="px-2"
+            >
+              <Tab 
+                label="Éditeur HTML" 
+                icon={<CodeIcon />} 
+                iconPosition="start"
+              />
+              <Tab 
+                label="Aperçu" 
+                icon={<VisibilityIcon />} 
+                iconPosition="start"
+                onClick={handlePreview}
+              />
+            </Tabs>
+          </Box>
+          
+          <Box sx={{ p: 3, minHeight: '400px' }} hidden={activeTab !== 0}>
+            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, height: '100%', minHeight: '400px' }}>
+              <CodeMirror
+                value={formik.values.htmlContent}
+                options={{
+                  mode: 'htmlmixed',
+                  theme: 'material',
+                  lineNumbers: true,
+                  lineWrapping: true
+                }}
+                onBeforeChange={(editor: any, data: any, value: string) => {
+                  formik.setFieldValue('htmlContent', value);
+                }}
+                onChange={(editor: any, data: any, value: string) => {
+                  // Mise à jour en temps réel lors de la modification
+                }}
+                className="h-full"
+              />
+            </Box>
+            {formik.touched.htmlContent && formik.errors.htmlContent && (
+              <Typography color="error" variant="caption" sx={{ mt: 1 }}>
+                {formik.errors.htmlContent}
+              </Typography>
+            )}
+          </Box>
+        </Card>
+        
+        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 4 }}>
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={() => navigate('/templates')}
+            disabled={isSubmitting}
+            startIcon={<CancelIcon />}
+            size="large"
+            className="rounded-md"
+          >
+            Annuler
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            type="submit"
+            disabled={isSubmitting}
+            startIcon={isSubmitting ? <CircularProgress size={20} /> : <SaveIcon />}
+            size="large"
+            className="rounded-md shadow-md"
+          >
+            {isEditing ? "Mettre à jour" : "Créer le template"}
+          </Button>
+        </Box>
+      </form>
     </Layout>
   );
 };
