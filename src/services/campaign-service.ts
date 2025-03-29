@@ -38,7 +38,7 @@ interface Campaign {
   name: string;
   templateId: string;
   smtpProviderId: string;
-  status: 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed';
+  status: 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed' | 'paused';
   recipients: Recipient[];
   scheduledAt?: number;
   sentAt?: number;
@@ -541,7 +541,7 @@ export class CampaignService {
         name: emailCampaign.name,
         templateId: emailCampaign.templateId,
         smtpProviderId: emailCampaign.providerId,
-        status: emailCampaign.status === 'sent' ? 'completed' : emailCampaign.status as 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed',
+        status: emailCampaign.status === 'sent' ? 'completed' : emailCampaign.status as 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed' | 'paused',
         recipients: emailCampaign.recipients.map(email => ({ 
           email, 
           firstName: '', 
@@ -576,7 +576,7 @@ export class CampaignService {
    */
   static async updateCampaignStatus(
     campaignId: string, 
-    status: 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed', 
+    status: 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed' | 'paused', 
     errorMessage?: string
   ): Promise<boolean> {
     try {
@@ -653,6 +653,105 @@ export class CampaignService {
     } catch (error) {
       console.error(`Erreur lors de la mise à jour des statistiques de la campagne ${campaignId}:`, error);
       return false;
+    }
+  }
+
+  /**
+   * Met en pause une campagne en cours d'envoi
+   * @param campaignId ID de la campagne
+   * @returns Résultat de l'opération
+   */
+  static async pauseCampaign(campaignId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const campaign = await this.getCampaign(campaignId);
+      if (!campaign) {
+        return { success: false, error: 'Campagne non trouvée' };
+      }
+
+      // Vérifier que la campagne est en cours d'envoi
+      if (campaign.status !== 'sending') {
+        return { 
+          success: false, 
+          error: 'Seules les campagnes en cours d\'envoi peuvent être mises en pause' 
+        };
+      }
+
+      // Mettre à jour le statut de la campagne
+      const result = await this.updateCampaignStatus(campaignId, 'paused');
+      return { success: result };
+    } catch (error: any) {
+      console.error(`Erreur lors de la mise en pause de la campagne ${campaignId}:`, error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Reprend l'envoi d'une campagne mise en pause
+   * @param campaignId ID de la campagne
+   * @returns Résultat de l'opération
+   */
+  static async resumeCampaign(campaignId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const campaign = await this.getCampaign(campaignId);
+      if (!campaign) {
+        return { success: false, error: 'Campagne non trouvée' };
+      }
+
+      // Vérifier que la campagne est en pause
+      if (campaign.status !== 'paused') {
+        return { 
+          success: false, 
+          error: 'Seules les campagnes en pause peuvent être reprises' 
+        };
+      }
+
+      // Mettre à jour le statut de la campagne
+      const result = await this.updateCampaignStatus(campaignId, 'sending');
+      
+      // Relancer l'envoi de la campagne
+      if (result) {
+        this.sendCampaign(campaignId);
+      }
+      
+      return { success: result };
+    } catch (error: any) {
+      console.error(`Erreur lors de la reprise de la campagne ${campaignId}:`, error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Réessaie une campagne qui a échoué
+   * @param campaignId ID de la campagne
+   * @returns Résultat de l'opération
+   */
+  static async retryCampaign(campaignId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const campaign = await this.getCampaign(campaignId);
+      if (!campaign) {
+        return { success: false, error: 'Campagne non trouvée' };
+      }
+
+      // Vérifier que la campagne a échoué
+      if (campaign.status !== 'failed') {
+        return { 
+          success: false, 
+          error: 'Seules les campagnes échouées peuvent être réessayées' 
+        };
+      }
+
+      // Mettre à jour le statut de la campagne
+      const result = await this.updateCampaignStatus(campaignId, 'sending');
+      
+      // Relancer l'envoi de la campagne
+      if (result) {
+        this.sendCampaign(campaignId);
+      }
+      
+      return { success: result };
+    } catch (error: any) {
+      console.error(`Erreur lors de la nouvelle tentative pour la campagne ${campaignId}:`, error);
+      return { success: false, error: error.message };
     }
   }
 } 

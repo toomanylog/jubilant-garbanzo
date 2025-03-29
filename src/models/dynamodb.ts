@@ -74,7 +74,7 @@ export interface EmailCampaign {
   fromName: string;
   fromEmail: string;
   recipients: string[];
-  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
+  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed' | 'paused';
   scheduledAt: string | null;
   sentAt: string | null;
   createdAt: string;

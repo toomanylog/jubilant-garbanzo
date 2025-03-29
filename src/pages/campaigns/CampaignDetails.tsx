@@ -54,6 +54,11 @@ import 'dayjs/locale/fr';
 import { toast } from 'react-toastify';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import EventBusyIcon from '@mui/icons-material/EventBusy';
+import DownloadIcon from '@mui/icons-material/Download';
+import PauseIcon from '@mui/icons-material/Pause';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ReplayIcon from '@mui/icons-material/Replay';
 
 import Layout from '../../components/layout/Layout';
 import { useAuth } from '../../contexts/AuthContext';
@@ -76,6 +81,9 @@ const CampaignDetails: React.FC = () => {
   const [openScheduleDialog, setOpenScheduleDialog] = useState(false);
   const [openCancelDialog, setOpenCancelDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [openPauseDialog, setOpenPauseDialog] = useState(false);
+  const [openResumeDialog, setOpenResumeDialog] = useState(false);
+  const [openRetryDialog, setOpenRetryDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [scheduledDate, setScheduledDate] = useState<dayjs.Dayjs | null>(dayjs().add(1, 'hour')); // 1 heure plus tard
 
@@ -182,6 +190,15 @@ const CampaignDetails: React.FC = () => {
   
   const handleOpenDeleteDialog = () => setOpenDeleteDialog(true);
   const handleCloseDeleteDialog = () => setOpenDeleteDialog(false);
+
+  const handleOpenPauseDialog = () => setOpenPauseDialog(true);
+  const handleClosePauseDialog = () => setOpenPauseDialog(false);
+
+  const handleOpenResumeDialog = () => setOpenResumeDialog(true);
+  const handleCloseResumeDialog = () => setOpenResumeDialog(false);
+
+  const handleOpenRetryDialog = () => setOpenRetryDialog(true);
+  const handleCloseRetryDialog = () => setOpenRetryDialog(false);
 
   // Fonctions pour gérer les actions de campagne
   const handleSendCampaign = async () => {
@@ -334,6 +351,99 @@ const CampaignDetails: React.FC = () => {
     }
   };
 
+  const handlePauseCampaign = async () => {
+    if (!campaignId) return;
+    
+    setIsProcessing(true);
+    
+    try {
+      const result = await CampaignService.pauseCampaign(campaignId);
+      
+      if (result.success) {
+        toast.success('La campagne a été mise en pause avec succès');
+        
+        // Mettre à jour le statut local de la campagne
+        if (campaign) {
+          const updatedCampaign = {
+            ...campaign,
+            status: 'paused' as 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed' | 'paused',
+            updatedAt: new Date().toISOString()
+          };
+          setCampaign(updatedCampaign);
+        }
+      } else {
+        toast.error(`Erreur lors de la mise en pause: ${result.error}`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Une erreur est survenue lors de la mise en pause');
+    } finally {
+      setIsProcessing(false);
+      handleClosePauseDialog();
+    }
+  };
+
+  const handleResumeCampaign = async () => {
+    if (!campaignId) return;
+    
+    setIsProcessing(true);
+    
+    try {
+      const result = await CampaignService.resumeCampaign(campaignId);
+      
+      if (result.success) {
+        toast.success('La campagne a repris avec succès');
+        
+        // Mettre à jour le statut local de la campagne
+        if (campaign) {
+          const updatedCampaign = {
+            ...campaign,
+            status: 'sending' as 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed' | 'paused',
+            updatedAt: new Date().toISOString()
+          };
+          setCampaign(updatedCampaign);
+        }
+      } else {
+        toast.error(`Erreur lors de la reprise: ${result.error}`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Une erreur est survenue lors de la reprise');
+    } finally {
+      setIsProcessing(false);
+      handleCloseResumeDialog();
+    }
+  };
+
+  const handleRetryCampaign = async () => {
+    if (!campaignId) return;
+    
+    setIsProcessing(true);
+    
+    try {
+      const result = await CampaignService.retryCampaign(campaignId);
+      
+      if (result.success) {
+        toast.success('Nouvelle tentative d\'envoi lancée avec succès');
+        
+        // Mettre à jour le statut local de la campagne
+        if (campaign) {
+          const updatedCampaign = {
+            ...campaign,
+            status: 'sending' as 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed' | 'paused',
+            updatedAt: new Date().toISOString()
+          };
+          setCampaign(updatedCampaign);
+        }
+      } else {
+        toast.error(`Erreur lors de la nouvelle tentative: ${result.error}`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Une erreur est survenue lors de la nouvelle tentative');
+    } finally {
+      setIsProcessing(false);
+      handleCloseRetryDialog();
+    }
+  };
+
   // Affichage pendant le chargement
   if (isLoading) {
     return (
@@ -407,21 +517,47 @@ const CampaignDetails: React.FC = () => {
                 >
                   Envoyer
                 </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<EditIcon />}
-                  onClick={() => navigate(`/campaigns/${campaignId}`)}
-                >
-                  Modifier
-                </Button>
               </>
+            )}
+            
+            {campaign.status === 'sending' && (
+              <Button
+                variant="outlined"
+                color="warning"
+                startIcon={<PauseIcon />}
+                onClick={handleOpenPauseDialog}
+              >
+                Mettre en pause
+              </Button>
+            )}
+            
+            {campaign.status === 'paused' && (
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<PlayArrowIcon />}
+                onClick={handleOpenResumeDialog}
+              >
+                Reprendre
+              </Button>
+            )}
+            
+            {campaign.status === 'failed' && (
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<ReplayIcon />}
+                onClick={handleOpenRetryDialog}
+              >
+                Réessayer
+              </Button>
             )}
             
             {campaign.status === 'scheduled' && (
               <Button
                 variant="outlined"
                 color="warning"
-                startIcon={<CancelIcon />}
+                startIcon={<EventBusyIcon />}
                 onClick={handleOpenCancelDialog}
               >
                 Annuler la planification
@@ -860,6 +996,78 @@ const CampaignDetails: React.FC = () => {
             startIcon={isProcessing ? <CircularProgress size={20} /> : <DeleteIcon />}
           >
             {isProcessing ? 'Suppression...' : 'Supprimer'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialogue de pause */}
+      <Dialog open={openPauseDialog} onClose={() => !isProcessing && handleClosePauseDialog()}>
+        <DialogTitle>Mettre en pause la campagne</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Êtes-vous sûr de vouloir mettre en pause cette campagne ? La campagne sera mise en pause et ne pourra plus être envoyée.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClosePauseDialog} disabled={isProcessing}>
+            Annuler
+          </Button>
+          <Button 
+            onClick={handlePauseCampaign} 
+            color="warning" 
+            variant="contained"
+            disabled={isProcessing}
+            startIcon={isProcessing ? <CircularProgress size={20} /> : <WarningIcon />}
+          >
+            {isProcessing ? 'Pause...' : 'Mettre en pause'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialogue de reprise */}
+      <Dialog open={openResumeDialog} onClose={() => !isProcessing && handleCloseResumeDialog()}>
+        <DialogTitle>Reprendre la campagne</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Êtes-vous sûr de vouloir reprendre cette campagne ? La campagne reprendra l'état d'envoi.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseResumeDialog} disabled={isProcessing}>
+            Annuler
+          </Button>
+          <Button 
+            onClick={handleResumeCampaign} 
+            color="primary" 
+            variant="contained"
+            disabled={isProcessing}
+            startIcon={isProcessing ? <CircularProgress size={20} /> : <SendIcon />}
+          >
+            {isProcessing ? 'Reprise...' : 'Reprendre'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialogue de nouvelle tentative */}
+      <Dialog open={openRetryDialog} onClose={() => !isProcessing && handleCloseRetryDialog()}>
+        <DialogTitle>Lancer une nouvelle tentative</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Êtes-vous sûr de vouloir lancer une nouvelle tentative d'envoi pour cette campagne ?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseRetryDialog} disabled={isProcessing}>
+            Annuler
+          </Button>
+          <Button 
+            onClick={handleRetryCampaign} 
+            color="primary" 
+            variant="contained"
+            disabled={isProcessing}
+            startIcon={isProcessing ? <CircularProgress size={20} /> : <SendIcon />}
+          >
+            {isProcessing ? 'Nouvelle tentative...' : 'Lancer une nouvelle tentative'}
           </Button>
         </DialogActions>
       </Dialog>

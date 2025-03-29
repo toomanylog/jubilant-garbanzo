@@ -42,14 +42,24 @@ export class AwsSesService extends SmtpService {
     // Utiliser la configuration globale AWS pour la région et les identifiants
     // mais permettre de les remplacer par ceux du fournisseur si nécessaire
     const awsConfig = AWS.config;
+    const region = provider.region || awsConfig.region || 'us-east-1';
     
-    console.log('⚠️ Configuration SES - Utilisation de la région:', provider.region || awsConfig.region || 'us-east-1');
+    console.log('⚠️ Configuration SES - Utilisation de la région:', region);
     console.log('⚠️ Configuration SES - Access Key fournie par le fournisseur:', !!provider.username);
     console.log('⚠️ Configuration SES - Access Key globale:', !!awsConfig.credentials?.accessKeyId);
     
+    // Mise à jour de l'hôte SMTP si non spécifié
+    if (!provider.host && provider.region) {
+      console.log(`⚠️ Configuration SES - Mise à jour automatique de l'hôte SMTP pour la région ${region}`);
+      provider.host = `email-smtp.${region}.amazonaws.com`;
+    }
+    
+    console.log('⚠️ Configuration SES - Hôte SMTP utilisé:', provider.host || `email-smtp.${region}.amazonaws.com`);
+    
     // Créer une instance SES avec les identifiants et la région appropriés
     this.ses = new AWS.SES({
-      region: provider.region || awsConfig.region || 'us-east-1',
+      region: region,
+      endpoint: `https://email.${region}.amazonaws.com`,
       credentials: provider.username && provider.password ? {
         accessKeyId: provider.username,
         secretAccessKey: provider.password
