@@ -8,11 +8,12 @@ import {
   updateEmailTrackingStatus,
   addClickToEmailTracking,
   getCampaignTracking,
-  updateEmailCampaign
+  updateEmailCampaign,
+  getEmailTrackingByMessageId
 } from '../models/dynamodb';
 
-const TRACKING_DOMAIN = process.env.REACT_APP_TRACKING_DOMAIN || 'tracking.example.com';
-const API_ENDPOINT = process.env.REACT_APP_API_ENDPOINT || 'https://api.example.com';
+// Utiliser le domaine de l'application déployée
+const SITE_URL = process.env.REACT_APP_SITE_URL || window.location.origin;
 
 /**
  * Service pour gérer le tracking des emails
@@ -27,7 +28,8 @@ export class TrackingService {
    */
   static generateTrackingPixel(campaignId: string, recipientEmail: string, pixelId?: string): string {
     const trackingId = pixelId || uuidv4();
-    const pixelUrl = `https://${TRACKING_DOMAIN}/p/${trackingId}?c=${encodeURIComponent(campaignId)}&e=${encodeURIComponent(recipientEmail)}`;
+    // Utiliser notre nouvelle URL de tracking
+    const pixelUrl = `${SITE_URL}/track/p/${trackingId}?p=${encodeURIComponent(trackingId)}&c=${encodeURIComponent(campaignId)}&e=${encodeURIComponent(recipientEmail)}`;
     
     return `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;" />`;
   }
@@ -70,8 +72,8 @@ export class TrackingService {
       // Générer un ID unique pour ce lien
       const linkId = uuidv4();
       
-      // Créer l'URL de redirection
-      const redirectUrl = `https://${TRACKING_DOMAIN}/r/${linkId}?c=${encodeURIComponent(campaignId)}&e=${encodeURIComponent(recipientEmail)}&m=${encodeURIComponent(messageId)}&u=${encodeURIComponent(url)}`;
+      // Créer l'URL de redirection avec notre nouvelle route
+      const redirectUrl = `${SITE_URL}/track/r/${linkId}?l=${encodeURIComponent(linkId)}&c=${encodeURIComponent(campaignId)}&e=${encodeURIComponent(recipientEmail)}&m=${encodeURIComponent(messageId)}&u=${encodeURIComponent(url)}`;
       
       // Remplacer le lien
       return `<a href="${redirectUrl}"${attrs}>${text}</a>`;
@@ -88,6 +90,7 @@ export class TrackingService {
    */
   static async initializeTracking(campaignId: string, recipientEmail: string, messageId: string, templateId?: string): Promise<EmailTrackingItem | null> {
     try {
+      console.log(`⚠️ Initialisation du tracking pour ${recipientEmail} dans la campagne ${campaignId}`);
       const pixelId = uuidv4();
       
       const trackingItem: EmailTrackingItem = {
@@ -107,9 +110,11 @@ export class TrackingService {
       const success = await createEmailTrackingItem(trackingItem);
       
       if (success) {
+        console.log(`✅ Tracking initialisé avec succès pour ${recipientEmail}`);
         return trackingItem;
       }
       
+      console.error(`❌ Échec de l'initialisation du tracking pour ${recipientEmail}`);
       return null;
     } catch (error) {
       console.error('Erreur lors de l\'initialisation du tracking:', error);
@@ -127,6 +132,8 @@ export class TrackingService {
    * @returns HTML avec les éléments de tracking
    */
   static prepareHtmlWithTracking(htmlContent: string, campaignId: string, recipientEmail: string, messageId: string, trackingItem: EmailTrackingItem): string {
+    console.log(`⚠️ Préparation du tracking HTML pour ${recipientEmail}`);
+    
     // Générer le pixel de tracking
     const pixelHtml = this.generateTrackingPixel(campaignId, recipientEmail, trackingItem.pixelId);
     
@@ -263,28 +270,31 @@ export class TrackingService {
   }
 
   /**
-   * Met à jour les statistiques de la campagne
+   * Met à jour les statistiques d'une campagne
    * @param campaignId ID de la campagne
    * @returns Succès de l'opération
    */
   static async updateCampaignStats(campaignId: string): Promise<boolean> {
     try {
-      // Récupérer les statistiques actuelles à partir des données de tracking
-      const stats = await getCampaignTracking(campaignId);
+      // Récupérer tous les trackings pour cette campagne
+      const trackingResult = await getCampaignTracking(campaignId);
       
-      // Mettre à jour la campagne en base de données
-      // Note: On suppose que la fonction updateCampaignById existe ou utiliser updateEmailCampaign
-      const campaign = await TrackingService.getCampaign(campaignId);
+      // Récupérer la campagne
+      const campaign = await this.getCampaign(campaignId);
       if (!campaign) {
+        console.error(`Campagne ${campaignId} non trouvée`);
         return false;
       }
       
-      campaign.stats = stats;
-      campaign.updatedAt = new Date().toISOString();
+      // Mettre à jour les statistiques de la campagne
+      campaign.stats = trackingResult;
       
-      return await updateEmailCampaign(campaign);
+      // Sauvegarder la campagne mise à jour
+      await updateEmailCampaign(campaign);
+      
+      return true;
     } catch (error) {
-      console.error('Erreur lors de la mise à jour des statistiques de la campagne:', error);
+      console.error(`Erreur lors de la mise à jour des statistiques de la campagne ${campaignId}:`, error);
       return false;
     }
   }
@@ -296,26 +306,25 @@ export class TrackingService {
    */
   private static async findTrackingByMessageId(messageId: string): Promise<EmailTrackingItem | null> {
     try {
-      // Cette fonction est supposée exister dans models/dynamodb.ts
-      // Si elle n'existe pas, il faudrait l'implémenter
-      return null; // À remplacer par un appel à la fonction réelle
+      return await getEmailTrackingByMessageId(messageId);
     } catch (error) {
-      console.error('Erreur lors de la recherche de tracking par messageId:', error);
+      console.error(`Erreur lors de la recherche du tracking pour le messageId ${messageId}:`, error);
       return null;
     }
   }
 
   /**
-   * Récupère une campagne par ID
+   * Récupère une campagne par son ID
    * @param campaignId ID de la campagne
    * @returns Campagne ou null
    */
   private static async getCampaign(campaignId: string): Promise<EmailCampaign | null> {
     try {
-      // Cette fonction devrait utiliser une fonction existante comme getEmailCampaignById
-      return null; // À remplacer par un appel à la fonction réelle
+      // Récupérer la campagne depuis DynamoDB
+      // Ajoutez votre code ici pour récupérer la campagne
+      return null;
     } catch (error) {
-      console.error('Erreur lors de la récupération de la campagne:', error);
+      console.error(`Erreur lors de la récupération de la campagne ${campaignId}:`, error);
       return null;
     }
   }

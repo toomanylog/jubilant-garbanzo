@@ -2,9 +2,38 @@
 [build]
   command = "CI=false npm run build"
   publish = "build"
+  functions = "functions"
+
+# Variables d'environnement pour la production
+[build.environment]
+  NODE_VERSION = "16"
+  AWS_LAMBDA_JS_RUNTIME = "nodejs16.x"
 
 # Gestion des routes SPA (Single Page Application)
 [[redirects]]
   from = "/*"
   to = "/index.html"
-  status = 200 
+  status = 200
+  force = false
+  conditions = {Role = ["anonymous", "user"]}
+  
+# Redirections pour les fonctions de tracking
+[[redirects]]
+  from = "/track/p/*"
+  to = "/.netlify/functions/tracking-pixel"
+  status = 200
+  force = true
+  query = {p = ":pixelId", c = ":campaignId", e = ":recipientEmail"}
+
+[[redirects]]
+  from = "/track/r/*"
+  to = "/.netlify/functions/link-redirect"
+  status = 302
+  force = true
+  query = {l = ":linkId", c = ":campaignId", e = ":recipientEmail", m = ":messageId", u = ":url"}
+
+[[redirects]]
+  from = "/api/webhook/bounce"
+  to = "/.netlify/functions/bounce-webhook"
+  status = 200
+  force = true 
