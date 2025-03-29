@@ -198,6 +198,28 @@ export class MailjetService extends SmtpService {
 
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      // Convertir 'to' en tableau si c'est une chaîne
+      const toArray = Array.isArray(options.to) ? options.to : [options.to];
+      
+      // Préparer l'expéditeur
+      let fromEmail: string;
+      let fromName: string;
+      
+      if (typeof options.from === 'string') {
+        // Extraction du nom et de l'email à partir du format "Nom <email@exemple.com>"
+        const matches = options.from.match(/(.*?)\s*<(.+?)>/);
+        if (matches && matches.length === 3) {
+          fromName = matches[1].trim();
+          fromEmail = matches[2].trim();
+        } else {
+          fromName = '';
+          fromEmail = options.from.trim();
+        }
+      } else {
+        fromEmail = options.from.email;
+        fromName = options.from.name;
+      }
+
       // Définir le type de réponse attendu de Mailjet
       interface MailjetResponse {
         Messages: Array<{
@@ -221,10 +243,10 @@ export class MailjetService extends SmtpService {
           Messages: [
             {
               From: {
-                Email: options.from.email,
-                Name: options.from.name
+                Email: fromEmail,
+                Name: fromName
               },
-              To: options.to.map(email => ({ Email: email })),
+              To: toArray.map((email: string) => ({ Email: email })),
               Subject: options.subject,
               HTMLPart: options.html,
               TextPart: options.text || '',
