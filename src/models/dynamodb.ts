@@ -82,6 +82,14 @@ export interface EmailCampaign {
   stats: EmailCampaignStats;
 }
 
+// Interface pour les paramètres utilisateur
+export interface UserSettings {
+  userId: string;
+  testEmails: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Fonctions pour interagir avec DynamoDB
 
 // Utilisateurs
@@ -466,6 +474,69 @@ export const deleteSmtpProvider = async (providerId: string): Promise<boolean> =
     return true;
   } catch (error) {
     console.error('⚠️ ERROR deleteSmtpProvider:', error);
+    return false;
+  }
+};
+
+// Fonction pour récupérer les paramètres utilisateur
+export const getUserSettings = async (userId: string): Promise<UserSettings | null> => {
+  const params = {
+    TableName: 'UserSettings',
+    Key: {
+      userId
+    }
+  };
+
+  try {
+    const result = await dynamoDB.get(params).promise();
+    return result.Item as UserSettings || null;
+  } catch (error) {
+    console.error('Erreur lors de la récupération des paramètres utilisateur:', error);
+    return null;
+  }
+};
+
+// Fonction pour sauvegarder les paramètres utilisateur
+export const saveUserSettings = async (settings: UserSettings): Promise<boolean> => {
+  const params = {
+    TableName: 'UserSettings',
+    Item: settings
+  };
+
+  try {
+    await dynamoDB.put(params).promise();
+    return true;
+  } catch (error) {
+    console.error('Erreur lors de la sauvegarde des paramètres utilisateur:', error);
+    return false;
+  }
+};
+
+// Fonction pour mettre à jour les adresses email de test
+export const updateTestEmails = async (userId: string, testEmails: string[]): Promise<boolean> => {
+  try {
+    // Récupérer les paramètres existants ou créer une nouvelle entrée
+    let settings = await getUserSettings(userId);
+    const now = new Date().toISOString();
+    
+    if (!settings) {
+      settings = {
+        userId,
+        testEmails,
+        createdAt: now,
+        updatedAt: now
+      };
+    } else {
+      settings = {
+        ...settings,
+        testEmails,
+        updatedAt: now
+      };
+    }
+    
+    return await saveUserSettings(settings);
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour des adresses email de test:', error);
     return false;
   }
 }; 
