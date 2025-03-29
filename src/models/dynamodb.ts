@@ -34,6 +34,14 @@ export interface SmtpProvider {
   senders?: SmtpSender[];
   senderRotationEnabled?: boolean;
   senderRotationType?: 'sequential' | 'random';
+  // Paramètres de taux d'envoi
+  rateLimits?: {
+    perSecond?: number;
+    perMinute?: number;
+    perHour?: number;
+    perDay?: number;
+    maxTotal?: number;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -68,8 +76,8 @@ export interface EmailCampaign {
   campaignId: string;
   userId: string;
   name: string;
-  templateId: string;
-  providerId: string;
+  templateId: string | string[]; // Peut être un ID unique ou un tableau d'IDs
+  smtpProviderId: string | string[]; // Peut être un ID unique ou un tableau d'IDs
   subject: string;
   fromName: string;
   fromEmail: string;

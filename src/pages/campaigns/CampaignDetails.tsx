@@ -119,11 +119,11 @@ const CampaignDetails: React.FC = () => {
         console.log("Campagne chargée avec succès:", campaignData.name);
         setCampaign(campaignData);
         
-        // Récupérer le template et le fournisseur SMTP associés
+        // Récupérer les données du template et du fournisseur SMTP
         console.log("Chargement du template et du fournisseur SMTP...");
         const [templateData, providerData] = await Promise.all([
-          getEmailTemplateById(campaignData.templateId),
-          getSmtpProviderById(campaignData.providerId)
+          getEmailTemplateById(campaignData.templateId as string),
+          getSmtpProviderById(campaignData.smtpProviderId as string)
         ]);
         
         console.log("Template chargé:", templateData?.name);

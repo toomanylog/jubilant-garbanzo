@@ -24,9 +24,84 @@ export interface EmailOptions {
 // Classe abstraite pour tous les fournisseurs SMTP
 abstract class SmtpService {
   protected provider: SmtpProvider;
+  private lastSendTime: number = 0;
+  private sendCounts: {
+    second: { count: number, timestamp: number },
+    minute: { count: number, timestamp: number },
+    hour: { count: number, timestamp: number },
+    day: { count: number, timestamp: number },
+    total: number
+  };
 
   constructor(provider: SmtpProvider) {
     this.provider = provider;
+    this.sendCounts = {
+      second: { count: 0, timestamp: Date.now() },
+      minute: { count: 0, timestamp: Date.now() },
+      hour: { count: 0, timestamp: Date.now() },
+      day: { count: 0, timestamp: Date.now() },
+      total: 0
+    };
+  }
+
+  // Vérification des limites de taux
+  protected async checkRateLimits(): Promise<{ canSend: boolean, reason?: string }> {
+    const now = Date.now();
+    const rateLimits = this.provider.rateLimits;
+
+    if (!rateLimits) {
+      return { canSend: true };
+    }
+
+    // Réinitialiser les compteurs si nécessaire
+    if (now - this.sendCounts.second.timestamp >= 1000) {
+      this.sendCounts.second = { count: 0, timestamp: now };
+    }
+    if (now - this.sendCounts.minute.timestamp >= 60000) {
+      this.sendCounts.minute = { count: 0, timestamp: now };
+    }
+    if (now - this.sendCounts.hour.timestamp >= 3600000) {
+      this.sendCounts.hour = { count: 0, timestamp: now };
+    }
+    if (now - this.sendCounts.day.timestamp >= 86400000) {
+      this.sendCounts.day = { count: 0, timestamp: now };
+    }
+
+    // Vérifier les limites
+    if (rateLimits.perSecond && this.sendCounts.second.count >= rateLimits.perSecond) {
+      return { canSend: false, reason: `Limite par seconde (${rateLimits.perSecond}) atteinte` };
+    }
+    if (rateLimits.perMinute && this.sendCounts.minute.count >= rateLimits.perMinute) {
+      return { canSend: false, reason: `Limite par minute (${rateLimits.perMinute}) atteinte` };
+    }
+    if (rateLimits.perHour && this.sendCounts.hour.count >= rateLimits.perHour) {
+      return { canSend: false, reason: `Limite par heure (${rateLimits.perHour}) atteinte` };
+    }
+    if (rateLimits.perDay && this.sendCounts.day.count >= rateLimits.perDay) {
+      return { canSend: false, reason: `Limite par jour (${rateLimits.perDay}) atteinte` };
+    }
+    if (rateLimits.maxTotal && this.sendCounts.total >= rateLimits.maxTotal) {
+      return { canSend: false, reason: `Limite totale (${rateLimits.maxTotal}) atteinte` };
+    }
+
+    return { canSend: true };
+  }
+
+  // Mise à jour des compteurs après un envoi
+  protected updateSendCounts(): void {
+    this.sendCounts.second.count++;
+    this.sendCounts.minute.count++;
+    this.sendCounts.hour.count++;
+    this.sendCounts.day.count++;
+    this.sendCounts.total++;
+    this.lastSendTime = Date.now();
+  }
+
+  // Détecte si le contenu est au format HTML
+  protected isHtmlContent(content: string): boolean {
+    // Vérifier si le contenu contient des balises HTML
+    const htmlRegex = /<([a-z][a-z0-9]*)\b[^>]*>(.*?)<\/\1>/i;
+    return htmlRegex.test(content) || content.includes('<html') || content.includes('<body') || content.includes('<div') || content.includes('<p');
   }
 
   abstract sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }>;
@@ -115,6 +190,15 @@ export class AwsSesService extends SmtpService {
 
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
+      // Vérifier les limites de taux
+      const rateCheck = await this.checkRateLimits();
+      if (!rateCheck.canSend) {
+        return {
+          success: false,
+          error: rateCheck.reason || 'Limite de taux atteinte'
+        };
+      }
+
       // Convertir 'to' en tableau si c'est une chaîne
       const toAddresses = Array.isArray(options.to) ? options.to : [options.to];
       
@@ -134,6 +218,10 @@ export class AwsSesService extends SmtpService {
       }
       
       console.log(`⚠️ Envoi d'email - De: ${source}`);
+
+      // Détecter si le contenu est HTML
+      const isHtml = this.isHtmlContent(options.html);
+      console.log(`⚠️ Envoi d'email - Format détecté: ${isHtml ? 'HTML' : 'Texte'}`);
 
       const params = {
         Source: source,
@@ -160,6 +248,10 @@ export class AwsSesService extends SmtpService {
       };
 
       const result = await this.ses.sendEmail(params).promise();
+      
+      // Mettre à jour les compteurs d'envoi
+      this.updateSendCounts();
+      
       return {
         success: true,
         messageId: result.MessageId

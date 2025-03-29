@@ -76,27 +76,27 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
   );
   const [isScheduled, setIsScheduled] = useState(false);
 
-  // Valeurs par défaut
-  const defaultValues = {
+  // Formulaire initial
+  const initialValuesForm = {
     name: '',
-    templateId: '',
-    providerId: '',
     subject: '',
+    templateId: '',
+    smtpProviderId: '',
     fromName: '',
     fromEmail: '',
     recipients: '',
-    status: 'draft' as 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed'
+    content: ''
   };
 
-  // Schéma de validation
-  const validationSchema = Yup.object().shape({
-    name: Yup.string().required('Le nom est requis'),
-    templateId: Yup.string().required('Un modèle est requis'),
-    providerId: Yup.string().required('Un fournisseur SMTP est requis'),
-    subject: Yup.string().required('L\'objet est requis'),
+  // Schéma de validation Yup
+  const validationSchema = Yup.object({
+    name: Yup.string().required('Le nom de la campagne est requis'),
+    subject: Yup.string().required('Le sujet est requis'),
+    templateId: Yup.string().required('Un template est requis'),
+    smtpProviderId: Yup.string().required('Un fournisseur SMTP est requis'),
     fromName: Yup.string().required('Le nom d\'expéditeur est requis'),
     fromEmail: Yup.string().email('Email invalide').required('L\'email d\'expéditeur est requis'),
-    recipients: Yup.string().required('Les destinataires sont requis')
+    recipients: Yup.string().required('La liste des destinataires est requise')
   });
 
   // Chargement initial des données
@@ -144,13 +144,13 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
             
             formik.setValues({
               name: campaign.name,
-              templateId: campaign.templateId,
-              providerId: campaign.providerId,
-              subject: campaign.subject,
-              fromName: campaign.fromName,
-              fromEmail: campaign.fromEmail,
-              recipients: campaign.recipients.join('\n'),
-              status: campaign.status
+              subject: campaign.subject || '',
+              templateId: campaign.templateId as string,
+              smtpProviderId: campaign.smtpProviderId as string,
+              fromName: campaign.fromName || '',
+              fromEmail: campaign.fromEmail || '',
+              recipients: campaign.recipients ? campaign.recipients.join('\n') : '',
+              content: ''
             });
           } else {
             setError('Campagne non trouvée');
@@ -186,7 +186,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
 
   // Gestion du formulaire avec Formik
   const formik = useFormik({
-    initialValues: initialValues || defaultValues,
+    initialValues: initialValues || initialValuesForm,
     validationSchema,
     onSubmit: async (values) => {
       if (!currentUser) return;
@@ -195,17 +195,11 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
       setError(null);
       
       try {
-        // Préparer les destinataires en supprimant les lignes vides
-        let recipientsArray: string[] = [];
-        
-        if (typeof values.recipients === 'string') {
-          recipientsArray = values.recipients
-            .split('\n')
-            .map((email: string) => email.trim())
-            .filter((email: string) => email !== '');
-        } else {
-          recipientsArray = values.recipients;
-        }
+        // Transformer les recipients en tableau
+        const recipientsArray = values.recipients
+          .split('\n')
+          .map(email => email.trim())
+          .filter(email => email !== '');
         
         // Validation des emails des destinataires
         const invalidEmails = recipientsArray.filter(email => !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/));
@@ -218,7 +212,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
           userId: currentUser.userId,
           name: values.name,
           templateId: values.templateId,
-          providerId: values.providerId,
+          smtpProviderId: values.smtpProviderId,
           subject: values.subject,
           fromName: values.fromName,
           fromEmail: values.fromEmail,
@@ -267,8 +261,8 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
       const text = await navigator.clipboard.readText();
       if (text) {
         // Fusionner avec les destinataires existants
-        const currentRecipients = formik.values.recipients ? formik.values.recipients + '\n' : '';
-        const newText = currentRecipients + text;
+        const currentRecipients = formik.values.recipients ? formik.values.recipients : '';
+        const newText = currentRecipients + '\n' + text;
         formik.setFieldValue('recipients', newText);
       }
     } catch (err) {
@@ -400,15 +394,15 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
                   fullWidth 
                   margin="normal" 
                   variant="outlined"
-                  error={formik.touched.providerId && Boolean(formik.errors.providerId)}
+                  error={formik.touched.smtpProviderId && Boolean(formik.errors.smtpProviderId)}
                   className="mb-4"
                 >
                   <InputLabel id="provider-label" required>Fournisseur SMTP</InputLabel>
                   <Select
                     labelId="provider-label"
-                    id="providerId"
-                    name="providerId"
-                    value={formik.values.providerId}
+                    id="smtpProviderId"
+                    name="smtpProviderId"
+                    value={formik.values.smtpProviderId}
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
                     label="Fournisseur SMTP"
@@ -425,8 +419,8 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
                       ))
                     )}
                   </Select>
-                  {formik.touched.providerId && formik.errors.providerId && (
-                    <FormHelperText>{formik.errors.providerId}</FormHelperText>
+                  {formik.touched.smtpProviderId && formik.errors.smtpProviderId && (
+                    <FormHelperText>{formik.errors.smtpProviderId}</FormHelperText>
                   )}
                 </FormControl>
                 
@@ -555,7 +549,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
 john.doe@exemple.com
 jane.doe@exemple.com"
                     value={formik.values.recipients}
-                    onChange={formik.handleChange}
+                    onChange={(e) => formik.setFieldValue('recipients', e.target.value)}
                     onBlur={formik.handleBlur}
                     error={formik.touched.recipients && Boolean(formik.errors.recipients)}
                     helperText={formik.touched.recipients && formik.errors.recipients}

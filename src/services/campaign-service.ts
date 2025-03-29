@@ -5,7 +5,9 @@ import {
   getSmtpProviderById,
   createEmailCampaign,
   updateEmailCampaign,
-  getEmailCampaignById
+  getEmailCampaignById,
+  EmailTemplate,
+  SmtpProvider
 } from '../models/dynamodb';
 import { createSmtpService, EmailOptions } from './smtp-service';
 import { TemplateService } from './template-service';
@@ -102,39 +104,43 @@ export class CampaignService {
   }
 
   /**
-   * Lance l'exécution d'une campagne d'emails
-   * @param campaignId ID de la campagne
-   * @returns État du lancement de la campagne
+   * Envoie une campagne d'email
+   * @param campaignId ID de la campagne à envoyer
+   * @returns Vrai si l'envoi est réussi, faux sinon
    */
   static async sendCampaign(campaignId: string): Promise<boolean> {
     try {
-      console.log(`Envoi de la campagne ${campaignId}...`);
-      
-      // Récupérer les détails de la campagne
+      // Récupérer la campagne
       const campaign = await this.getCampaign(campaignId);
       if (!campaign) {
         console.error(`Campagne ${campaignId} non trouvée`);
         return false;
       }
 
-      // Vérifier si nous avons plusieurs templates (format: template1,template2,template3)
-      let templateIds: string[] = [];
-      if (campaign.templateId.includes(',')) {
-        templateIds = campaign.templateId.split(',').map(id => id.trim());
-        console.log(`Utilisation de ${templateIds.length} templates pour la campagne ${campaignId}`);
-      } else {
-        templateIds = [campaign.templateId];
+      // Vérifier que la campagne n'a pas déjà été envoyée
+      if (campaign.status === 'completed') {
+        console.error(`La campagne ${campaignId} a déjà été envoyée`);
+        await this.updateCampaignStatus(campaignId, 'failed', 'La campagne a déjà été envoyée');
+        return false;
       }
 
-      // Récupérer tous les templates
-      const templates: any[] = [];
-      for (const templateId of templateIds) {
-        const template = await TemplateService.getTemplate(templateId);
-        if (!template) {
-          console.error(`Template ${templateId} non trouvé pour la campagne ${campaignId}`);
-          continue;
+      // Récupérer les templates (supporte désormais plusieurs templates)
+      let templates: EmailTemplate[] = [];
+      
+      // Si templateId est un tableau, récupérer tous les templates
+      if (Array.isArray(campaign.templateId)) {
+        for (const id of campaign.templateId) {
+          const template = await getEmailTemplateById(id);
+          if (template) {
+            templates.push(template);
+          }
         }
-        templates.push(template);
+      } else {
+        // Si c'est une chaîne, récupérer le template unique
+        const template = await getEmailTemplateById(campaign.templateId);
+        if (template) {
+          templates.push(template);
+        }
       }
 
       if (templates.length === 0) {
@@ -143,16 +149,41 @@ export class CampaignService {
         return false;
       }
 
-      // Récupérer le fournisseur SMTP
-      const smtpProvider = await SmtpProviderService.getSmtpProvider(campaign.smtpProviderId);
-      if (!smtpProvider) {
-        console.error(`Fournisseur SMTP ${campaign.smtpProviderId} non trouvé pour la campagne ${campaignId}`);
-        await this.updateCampaignStatus(campaignId, 'failed', 'Fournisseur SMTP non trouvé');
+      // Récupérer les fournisseurs SMTP (supporte désormais plusieurs fournisseurs)
+      let smtpProviders: SmtpProvider[] = [];
+      
+      // Si providerId est un tableau, récupérer tous les fournisseurs
+      if (Array.isArray(campaign.smtpProviderId)) {
+        for (const id of campaign.smtpProviderId) {
+          try {
+            const provider = await SmtpProviderService.getSmtpProvider(id);
+            if (provider) {
+              smtpProviders.push(provider);
+            }
+          } catch (error) {
+            console.error(`Erreur lors de la récupération du fournisseur SMTP ${id}:`, error);
+          }
+        }
+      } else {
+        // Si c'est une chaîne, récupérer le fournisseur unique
+        try {
+          const provider = await SmtpProviderService.getSmtpProvider(campaign.smtpProviderId);
+          if (provider) {
+            smtpProviders.push(provider);
+          }
+        } catch (error) {
+          console.error(`Erreur lors de la récupération du fournisseur SMTP ${campaign.smtpProviderId}:`, error);
+        }
+      }
+
+      if (smtpProviders.length === 0) {
+        console.error(`Aucun fournisseur SMTP valide trouvé pour la campagne ${campaignId}`);
+        await this.updateCampaignStatus(campaignId, 'failed', 'Aucun fournisseur SMTP valide trouvé');
         return false;
       }
 
-      // Créer le service SMTP
-      const smtpService = createSmtpService(smtpProvider);
+      // Créer les services SMTP pour chaque fournisseur
+      const smtpServices = smtpProviders.map(provider => createSmtpService(provider));
 
       // Mise à jour du statut
       await this.updateCampaignStatus(campaignId, 'sending');
@@ -177,6 +208,11 @@ export class CampaignService {
             const template = templates.length > 1 
               ? templates[Math.floor(Math.random() * templates.length)]
               : templates[0];
+            
+            // Sélectionner un service SMTP aléatoire
+            const smtpService = smtpServices.length > 1
+              ? smtpServices[Math.floor(Math.random() * smtpServices.length)]
+              : smtpServices[0];
             
             // Personnalisation du contenu HTML
             const personalizedHtml = this.personalizeContent(template.htmlContent, {
@@ -564,7 +600,7 @@ export class CampaignService {
         id: emailCampaign.campaignId,
         name: emailCampaign.name,
         templateId: emailCampaign.templateId,
-        smtpProviderId: emailCampaign.providerId,
+        smtpProviderId: emailCampaign.smtpProviderId,
         status: emailCampaign.status === 'sent' ? 'completed' : emailCampaign.status as 'draft' | 'scheduled' | 'sending' | 'completed' | 'failed' | 'paused',
         recipients: emailCampaign.recipients.map(email => ({ 
           email, 
