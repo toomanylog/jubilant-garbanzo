@@ -119,7 +119,7 @@ const EditSmtpProvider: React.FC = () => {
     providerType: provider.providerType,
     host: provider.host,
     port: provider.port,
-    senders: provider.senders?.length || 0
+    isActive: provider.isActive ? "Actif" : "Inactif"
   });
   
   return (
